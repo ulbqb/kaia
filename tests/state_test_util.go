@@ -157,7 +157,8 @@ func (t *StateTest) Run(subtest StateSubtest, vmconfig vm.Config) (*state.StateD
 	if err != nil {
 		return nil, UnsupportedForkError{subtest.Fork}
 	}
-	if t.json.Post[subtest.Fork][subtest.Index].Alloc != nil {
+	post := t.json.Post[subtest.Fork][subtest.Index]
+	if post.Alloc != nil {
 		config.Governance = &params.GovernanceConfig{
 			Reward: &params.RewardConfig{},
 			KIP71: &params.KIP71Config{
@@ -171,7 +172,6 @@ func (t *StateTest) Run(subtest StateSubtest, vmconfig vm.Config) (*state.StateD
 	memDBManager := database.NewMemoryDBManager()
 	statedb := MakePreState(memDBManager, t.json.Pre)
 
-	post := t.json.Post[subtest.Fork][subtest.Index]
 	msg, err := t.json.Tx.toMessage(post, config.Rules(block.Number()))
 	if err != nil {
 		return nil, err
