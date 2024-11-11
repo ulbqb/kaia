@@ -15,13 +15,14 @@ var _ = (*stTransactionMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (s stTransaction) MarshalJSON() ([]byte, error) {
 	type stTransaction struct {
-		GasPrice   *math.HexOrDecimal256 `json:"gasPrice"`
-		Nonce      math.HexOrDecimal64   `json:"nonce"`
-		To         string                `json:"to"`
-		Data       []string              `json:"data"`
-		GasLimit   []math.HexOrDecimal64 `json:"gasLimit"`
-		Value      []string              `json:"value"`
-		PrivateKey hexutil.Bytes         `json:"secretKey"`
+		GasPrice     *math.HexOrDecimal256 `json:"gasPrice"`
+		Nonce        math.HexOrDecimal64   `json:"nonce"`
+		To           string                `json:"to"`
+		Data         []string              `json:"data"`
+		GasLimit     []math.HexOrDecimal64 `json:"gasLimit"`
+		Value        []string              `json:"value"`
+		PrivateKey   hexutil.Bytes         `json:"secretKey"`
+		MaxFeePerGas *math.HexOrDecimal256 `json:"maxFeePerGas"`
 	}
 	var enc stTransaction
 	enc.GasPrice = (*math.HexOrDecimal256)(s.GasPrice)
@@ -36,19 +37,21 @@ func (s stTransaction) MarshalJSON() ([]byte, error) {
 	}
 	enc.Value = s.Value
 	enc.PrivateKey = s.PrivateKey
+	enc.MaxFeePerGas = (*math.HexOrDecimal256)(s.MaxFeePerGas)
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
 func (s *stTransaction) UnmarshalJSON(input []byte) error {
 	type stTransaction struct {
-		GasPrice   *math.HexOrDecimal256 `json:"gasPrice"`
-		Nonce      *math.HexOrDecimal64  `json:"nonce"`
-		To         *string               `json:"to"`
-		Data       []string              `json:"data"`
-		GasLimit   []math.HexOrDecimal64 `json:"gasLimit"`
-		Value      []string              `json:"value"`
-		PrivateKey *hexutil.Bytes        `json:"secretKey"`
+		GasPrice     *math.HexOrDecimal256 `json:"gasPrice"`
+		Nonce        *math.HexOrDecimal64  `json:"nonce"`
+		To           *string               `json:"to"`
+		Data         []string              `json:"data"`
+		GasLimit     []math.HexOrDecimal64 `json:"gasLimit"`
+		Value        []string              `json:"value"`
+		PrivateKey   *hexutil.Bytes        `json:"secretKey"`
+		MaxFeePerGas *math.HexOrDecimal256 `json:"maxFeePerGas"`
 	}
 	var dec stTransaction
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -77,6 +80,9 @@ func (s *stTransaction) UnmarshalJSON(input []byte) error {
 	}
 	if dec.PrivateKey != nil {
 		s.PrivateKey = *dec.PrivateKey
+	}
+	if dec.MaxFeePerGas != nil {
+		s.MaxFeePerGas = (*big.Int)(dec.MaxFeePerGas)
 	}
 	return nil
 }

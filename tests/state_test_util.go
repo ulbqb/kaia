@@ -101,13 +101,14 @@ type stEnvMarshaling struct {
 //go:generate gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
 
 type stTransaction struct {
-	GasPrice   *big.Int `json:"gasPrice"`
-	Nonce      uint64   `json:"nonce"`
-	To         string   `json:"to"`
-	Data       []string `json:"data"`
-	GasLimit   []uint64 `json:"gasLimit"`
-	Value      []string `json:"value"`
-	PrivateKey []byte   `json:"secretKey"`
+	GasPrice     *big.Int `json:"gasPrice"`
+	Nonce        uint64   `json:"nonce"`
+	To           string   `json:"to"`
+	Data         []string `json:"data"`
+	GasLimit     []uint64 `json:"gasLimit"`
+	Value        []string `json:"value"`
+	PrivateKey   []byte   `json:"secretKey"`
+	MaxFeePerGas *big.Int `json:"maxFeePerGas"`
 }
 
 type stTransactionMarshaling struct {
@@ -165,7 +166,7 @@ func (t *StateTest) Run(subtest StateSubtest, vmconfig vm.Config) (*state.StateD
 				DeferredTxFee: true,
 			},
 			KIP71: &params.KIP71Config{
-				LowerBoundBaseFee: t.json.Tx.GasPrice.Uint64(),
+				LowerBoundBaseFee: t.json.Tx.MaxFeePerGas.Uint64(),
 			},
 		}
 	}
