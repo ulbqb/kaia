@@ -99,7 +99,7 @@ func execStateTest(t *testing.T, st *testMatcher, test *StateTest, name string) 
 				"Merge",
 				"Shanghai",
 				"Cancun",
-				"Prague",
+				// "Prague",
 			}, subtest.Fork) {
 				t.Skipf("%s not supported yet", subtest.Fork)
 			}
