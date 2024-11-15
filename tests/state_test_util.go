@@ -102,15 +102,16 @@ type stEnvMarshaling struct {
 //go:generate gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
 
 type stTransaction struct {
-	GasPrice             *big.Int `json:"gasPrice"`
-	MaxFeePerGas         *big.Int `json:"maxFeePerGas"`
-	MaxPriorityFeePerGas *big.Int `json:"maxPriorityFeePerGas"`
-	Nonce                uint64   `json:"nonce"`
-	To                   string   `json:"to"`
-	Data                 []string `json:"data"`
-	GasLimit             []uint64 `json:"gasLimit"`
-	Value                []string `json:"value"`
-	PrivateKey           []byte   `json:"secretKey"`
+	GasPrice             *big.Int           `json:"gasPrice"`
+	MaxFeePerGas         *big.Int           `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *big.Int           `json:"maxPriorityFeePerGas"`
+	Nonce                uint64             `json:"nonce"`
+	To                   string             `json:"to"`
+	Data                 []string           `json:"data"`
+	GasLimit             []uint64           `json:"gasLimit"`
+	Value                []string           `json:"value"`
+	PrivateKey           []byte             `json:"secretKey"`
+	AuthorizationList    []*stAuthorization `json:"authorizationList,omitempty"`
 }
 
 type stTransactionMarshaling struct {
@@ -120,6 +121,28 @@ type stTransactionMarshaling struct {
 	Nonce               math.HexOrDecimal64
 	GasLimit            []math.HexOrDecimal64
 	PrivateKey          hexutil.Bytes
+}
+
+//go:generate go run github.com/fjl/gencodec -type stAuthorization -field-override stAuthorizationMarshaling -out gen_stauthorization.go
+
+// Authorization is an authorization from an account to deploy code at it's
+// address.
+type stAuthorization struct {
+	ChainID *big.Int
+	Address common.Address `json:"address" gencodec:"required"`
+	Nonce   uint64         `json:"nonce" gencodec:"required"`
+	V       *big.Int       `json:"v" gencodec:"required"`
+	R       *big.Int       `json:"r" gencodec:"required"`
+	S       *big.Int       `json:"s" gencodec:"required"`
+}
+
+// field type overrides for gencodec
+type stAuthorizationMarshaling struct {
+	ChainID *math.HexOrDecimal256
+	Nonce   math.HexOrDecimal64
+	V       *math.HexOrDecimal256
+	R       *math.HexOrDecimal256
+	S       *math.HexOrDecimal256
 }
 
 // getVMConfig takes a fork definition and returns a chain config.
