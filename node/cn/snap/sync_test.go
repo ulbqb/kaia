@@ -1375,6 +1375,11 @@ func makeAccountTrieNoStorage(n int) (*statedb.Trie, entrySlice) {
 	var entries entrySlice
 	for i := uint64(1); i <= uint64(n); i++ {
 		acc, _ := genExternallyOwnedAccount(i, big.NewInt(int64(i)))
+		pa := account.GetProgramAccount(acc)
+		zeroHash := common.Hash{}
+		if pa.GetStorageRoot().Unextend() == zeroHash {
+			pa.SetStorageRoot(emptyRoot.Extend())
+		}
 		serializer := account.NewAccountSerializerWithAccount(acc)
 		value, _ := rlp.EncodeToBytes(serializer)
 		key := key32(i)
@@ -1608,9 +1613,14 @@ func verifyTrie(db database.DBManager, root common.Hash, t *testing.T) {
 		}
 		acc := serializer.GetAccount()
 		pacc := account.GetProgramAccount(acc)
+		root := pacc.GetStorageRoot().Unextend()
+		zeroHash := common.Hash{}
+		if root == zeroHash {
+			root = emptyRoot
+		}
 		accounts++
-		if pacc != nil && pacc.GetStorageRoot().Unextend() != emptyRoot {
-			storeTrie, err := statedb.NewSecureStorageTrie(pacc.GetStorageRoot(), triedb, nil)
+		if pacc != nil && root != emptyRoot {
+			storeTrie, err := statedb.NewSecureStorageTrie(root.ExtendZero(), triedb, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

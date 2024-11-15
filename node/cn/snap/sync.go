@@ -1784,6 +1784,11 @@ func (s *Syncer) processAccountResponse(res *accountResponse) {
 	res.task.pend = 0
 	for i, acc := range res.accounts {
 		pacc := account.GetProgramAccount(acc)
+		root := pacc.GetStorageRoot().Unextend()
+		zeroHash := common.Hash{}
+		if root == zeroHash {
+			pacc.SetStorageRoot(emptyRoot.Extend())
+		}
 		// Check if the account is a contract with an unknown code
 		if pacc != nil && !bytes.Equal(pacc.GetCodeHash(), emptyCode[:]) {
 			if !s.db.HasCodeWithPrefix(common.BytesToHash(pacc.GetCodeHash())) {
@@ -1910,7 +1915,11 @@ func (s *Syncer) processStorageResponse(res *storageResponse) {
 			if pacc == nil {
 				continue
 			}
-
+			root := pacc.GetStorageRoot().Unextend()
+			zeroHash := common.Hash{}
+			if root == zeroHash {
+				pacc.SetStorageRoot(emptyRoot.Extend())
+			}
 			// If the packet contains multiple contract storage slots, all
 			// but the last are surely complete. The last contract may be
 			// chunked, so check it's continuation flag.
