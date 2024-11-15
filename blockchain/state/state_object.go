@@ -176,6 +176,11 @@ func (s *stateObject) getStorageTrie(db Database) Trie {
 	if s.storageTrie == nil {
 		if acc := account.GetProgramAccount(s.account); acc != nil {
 			var err error
+			root := acc.GetStorageRoot().Unextend()
+			zeroHash := common.Hash{}
+			if root == zeroHash {
+				acc.SetStorageRoot(emptyRoot.Extend())
+			}
 			s.storageTrie, err = s.openStorageTrie(acc.GetStorageRoot(), db)
 			if err != nil {
 				s.storageTrie, _ = s.openStorageTrie(common.ExtHash{}, db)

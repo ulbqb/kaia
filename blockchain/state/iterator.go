@@ -126,6 +126,12 @@ func (it *NodeIterator) step() error {
 	obj := serializer.GetAccount()
 
 	if pa := account.GetProgramAccount(obj); pa != nil {
+		root := pa.GetStorageRoot().Unextend()
+		zeroHash := common.Hash{}
+		if root == zeroHash {
+			pa.SetStorageRoot(emptyRoot.Extend())
+		}
+
 		dataTrie, err := it.state.db.OpenStorageTrie(pa.GetStorageRoot(), nil)
 		if err != nil {
 			return err

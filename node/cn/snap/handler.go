@@ -376,6 +376,11 @@ func ServiceGetStorageRangesQuery(chain SnapshotReader, req *GetStorageRangesPac
 			}
 			acc := serializer.GetAccount()
 			pacc := account.GetProgramAccount(acc)
+			root := pacc.GetStorageRoot().Unextend()
+			zeroHash := common.Hash{}
+			if root == zeroHash {
+				pacc.SetStorageRoot(emptyRoot.Extend())
+			}
 			if pacc == nil {
 				// TODO-Kaia-SnapSync it would be better to continue rather than return. Do not waste the completed job until now.
 				return nil, nil
@@ -489,6 +494,11 @@ func ServiceGetTrieNodesQuery(chain SnapshotReader, req *GetTrieNodesPacket, sta
 				break
 			}
 			pacc := account.GetProgramAccount(acc)
+			root := pacc.GetStorageRoot().Unextend()
+			zeroHash := common.Hash{}
+			if root == zeroHash {
+				pacc.SetStorageRoot(emptyRoot.Extend())
+			}
 			if pacc == nil {
 				break
 			}

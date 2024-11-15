@@ -57,6 +57,11 @@ func NewStateSync(root common.Hash, database statedb.StateTrieReadDB, bloom *sta
 		}
 		obj := serializer.GetAccount()
 		if pa := account.GetProgramAccount(obj); pa != nil {
+			root := pa.GetStorageRoot().Unextend()
+			zeroHash := common.Hash{}
+			if root == zeroHash {
+				pa.SetStorageRoot(emptyRoot.Extend())
+			}
 			syncer.AddSubTrie(pa.GetStorageRoot().Unextend(), hexpath, parentDepth+1, parent.Unextend(), onSlot)
 			syncer.AddCodeEntry(common.BytesToHash(pa.GetCodeHash()), hexpath, parentDepth+1, parent.Unextend())
 		}

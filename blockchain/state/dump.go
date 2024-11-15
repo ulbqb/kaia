@@ -23,6 +23,7 @@
 package state
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -74,9 +75,17 @@ func (self *StateDB) RawDump() Dump {
 			Storage:  make(map[string]string),
 		}
 		if pa := account.GetProgramAccount(data); pa != nil {
-			acc.Root = common.Bytes2Hex(pa.GetStorageRoot().Unextend().Bytes())
-			acc.CodeHash = common.Bytes2Hex(pa.GetCodeHash())
-			acc.Code = common.Bytes2Hex(obj.Code(self.db))
+			root := pa.GetStorageRoot().Unextend()
+			zeroHash := common.Hash{}
+			if root == zeroHash {
+				root = emptyRoot
+			}
+			acc.Root = common.Bytes2Hex(root.Bytes())
+			codeHash := pa.GetCodeHash()
+			acc.CodeHash = common.Bytes2Hex(codeHash)
+			if bytes.Equal(common.Hex2Bytes(acc.CodeHash), codeHash) {
+				acc.Code = common.Bytes2Hex(obj.Code(self.db))
+			}
 		} else {
 			acc.Root = common.Bytes2Hex(emptyRoot.Bytes())
 			acc.CodeHash = common.Bytes2Hex(emptyCodeHash)
