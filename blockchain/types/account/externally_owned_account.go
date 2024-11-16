@@ -196,18 +196,14 @@ func (e *ExternallyOwnedAccount) EncodeRLPExt(w io.Writer) error {
 
 func isEOAWithCode(e *ExternallyOwnedAccount) bool {
 	zeroHash := common.ExtHash{}
-	if e.codeHash == nil { // EOA without code. [n, b, hR, k] (Backwards Compatibility)
+
+	if e.codeHash == nil {
 		return false
-	} else if e.storageRoot == zeroHash && e.storageRoot.IsZeroExtended() && e.codeInfo == params.CodeInfo(0) { // EOA without code. [n, b, hR, k, 0x0, eCH, 0x0]
+	} else if (e.storageRoot == emptyRoot.ExtendZero() || e.storageRoot == zeroHash) && bytes.Equal(e.codeHash, emptyCodeHash) && e.codeInfo == params.CodeInfo(0) {
 		return false
-	} else if e.storageRoot == zeroHash || bytes.Equal(e.storageRoot.Bytes(), emptyRoot.Bytes()) {
-		return true
-	} else if bytes.Equal(e.codeHash, emptyCodeHash) || e.codeHash != nil {
-		return true
-	} else if e.codeInfo == params.CodeInfo(0) {
-		return true
 	}
-	return false
+	return true
+
 }
 
 func (e *ExternallyOwnedAccount) DecodeRLP(s *rlp.Stream) error {

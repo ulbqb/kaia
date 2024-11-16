@@ -83,12 +83,11 @@ func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
 
 // GenesisAccount is an account in the state of the genesis block.
 type GenesisAccount struct {
-	Code    []byte                      `json:"code,omitempty"`
-	Storage map[common.Hash]common.Hash `json:"storage,omitempty"`
-	Balance *big.Int                    `json:"balance" gencodec:"required"`
-	Nonce   uint64                      `json:"nonce,omitempty"`
-	// CodeHash   []byte                      `json:"codeHash,omitempty"`  // for tests
-	PrivateKey []byte `json:"secretKey,omitempty"` // for tests
+	Code       []byte                      `json:"code,omitempty"`
+	Storage    map[common.Hash]common.Hash `json:"storage,omitempty"`
+	Balance    *big.Int                    `json:"balance" gencodec:"required"`
+	Nonce      uint64                      `json:"nonce,omitempty"`
+	PrivateKey []byte                      `json:"secretKey,omitempty"` // for tests
 }
 
 // field type overrides for gencodec
@@ -102,11 +101,10 @@ type genesisSpecMarshaling struct {
 }
 
 type genesisAccountMarshaling struct {
-	Code    hexutil.Bytes
-	Balance *math.HexOrDecimal256
-	Nonce   math.HexOrDecimal64
-	Storage map[storageJSON]storageJSON
-	// CodeHash   hexutil.Bytes
+	Code       hexutil.Bytes
+	Balance    *math.HexOrDecimal256
+	Nonce      math.HexOrDecimal64
+	Storage    map[storageJSON]storageJSON
 	PrivateKey hexutil.Bytes
 }
 
@@ -320,13 +318,6 @@ func (g *Genesis) ToBlock(baseStateRoot common.Hash, db database.DBManager) *typ
 				continue
 			}
 		}
-		// for test
-		// if len(account.Code) != 0 && len(account.CodeHash) != 0 {
-		// 	logger.Crit("code and codehash cannot be simultaneously specified", "addr", addr.String())
-		// }
-		// if len(account.CodeHash) != 0 {
-		// 	stateDB.SetCodeToEOA(addr, account.CodeHash)
-		// }
 		for key, value := range account.Storage {
 			stateDB.SetState(addr, key, value)
 		}
@@ -362,7 +353,6 @@ func (g *Genesis) ToBlock(baseStateRoot common.Hash, db database.DBManager) *typ
 
 	stateDB.Commit(false)
 	stateDB.Database().TrieDB().Commit(root, true, g.Number)
-
 	return types.NewBlock(head, nil, nil)
 }
 
