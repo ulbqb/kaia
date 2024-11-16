@@ -203,7 +203,6 @@ func isEOAWithCode(e *ExternallyOwnedAccount) bool {
 		return false
 	}
 	return true
-
 }
 
 func (e *ExternallyOwnedAccount) DecodeRLP(s *rlp.Stream) error {
