@@ -1651,12 +1651,14 @@ func TestSyncAccountPerformance(t *testing.T) {
 			})
 		}
 	)
-	sourceAccountTrie, elems := makeAccountTrieNoStorage(100)
+	sourceAccountTrie, elems, storageTries, storageElems := makeAccountTrieWithStorage(100, 3000, true, false)
 
 	mkSource := func(name string) *testPeer {
 		source := newTestPeer(name, t, term)
 		source.accountTrie = sourceAccountTrie
 		source.accountValues = elems
+		source.storageTries = storageTries
+		source.storageValues = storageElems
 		return source
 	}
 	src := mkSource("source")
@@ -1669,7 +1671,7 @@ func TestSyncAccountPerformance(t *testing.T) {
 	// sync cycle starts. When popping the queue, we do not look it up again.
 	// Doing so would bring this number down to zero in this artificial testcase,
 	// but only add extra IO for no reason in practice.
-	if have, want := src.nTrienodeRequests, 3; have != want {
+	if have, want := src.nTrienodeRequests, 1; have != want {
 		fmt.Printf(src.Stats())
 		t.Errorf("trie node heal requests wrong, want %d, have %d", want, have)
 	}
