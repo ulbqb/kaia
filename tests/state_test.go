@@ -81,7 +81,9 @@ func TestExecutionSpecState(t *testing.T) {
 	st.skipLoad(`^byzantium\/`)
 	st.skipLoad(`^istanbul\/`)
 	st.skipLoad(`^berlin\/`)
+	st.skipLoad(`^shanghai\/`)
 	st.skipLoad(`^cancun\/`)
+	st.skipLoad(`^prague\/`)
 
 	// Tests to skip
 	// Because EIP-1052 must be retained for backward compatibility.

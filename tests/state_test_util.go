@@ -247,6 +247,7 @@ func (t *StateTest) Run(subtest StateSubtest, vmconfig vm.Config, isTestExecutio
 		}
 	}
 	if root != common.Hash(post.Root) {
+		fmt.Println("dump ", string(statedb.Dump()))
 		return statedb, fmt.Errorf("post state root mismatch: got %x, want %x", root, post.Root)
 	}
 	return statedb, nil
@@ -331,20 +332,40 @@ func (tx *stTransaction) toMessage(ps stPostState, r params.Rules, isTestExecuti
 		return nil, fmt.Errorf("invalid tx data %q", dataHex)
 	}
 
+	var authList types.AuthorizationList
+	fmt.Println("auth list", tx.AuthorizationList != nil)
+	if tx.AuthorizationList != nil {
+		authList = make(types.AuthorizationList, 0)
+		for _, auth := range tx.AuthorizationList {
+			chainID := auth.ChainID
+			if chainID == nil {
+				chainID = big.NewInt(0)
+			}
+			authList = append(authList, types.Authorization{
+				ChainID: chainID,
+				Address: auth.Address,
+				Nonce:   auth.Nonce,
+				V:       auth.V,
+				R:       auth.R,
+				S:       auth.S,
+			})
+		}
+	}
+
 	var intrinsicGas uint64
 	if isTestExecutionSpecState {
-		intrinsicGas, err = useEthIntrinsicGas(data, to == nil, r)
+		intrinsicGas, err = useEthIntrinsicGas(data, to == nil, authList, r)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		intrinsicGas, err = types.IntrinsicGas(data, nil, nil, to == nil, r)
+		intrinsicGas, err = types.IntrinsicGas(data, nil, authList, to == nil, r)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, data, true, intrinsicGas, nil)
+	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, true, intrinsicGas, nil, authList)
 	return msg, nil
 }
 
@@ -389,11 +410,11 @@ func useEthGasPrice(config *params.ChainConfig, json *stJSON) (*big.Int, error) 
 	return gasPrice, nil
 }
 
-func useEthIntrinsicGas(data []byte, contractCreation bool, r params.Rules) (uint64, error) {
+func useEthIntrinsicGas(data []byte, contractCreation bool, authorizationList types.AuthorizationList, r params.Rules) (uint64, error) {
 	if r.IsIstanbul {
 		r.IsPrague = true
 	}
-	return types.IntrinsicGas(data, nil, nil, contractCreation, r)
+	return types.IntrinsicGas(data, nil, authorizationList, contractCreation, r)
 }
 
 func useEthMiningReward(statedb *state.StateDB, evm *vm.EVM, tx *stTransaction, envBaseFee *big.Int, usedGas uint64, gasPrice *big.Int) {
