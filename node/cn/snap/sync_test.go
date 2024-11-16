@@ -1375,11 +1375,6 @@ func makeAccountTrieNoStorage(n int) (*statedb.Trie, entrySlice) {
 	var entries entrySlice
 	for i := uint64(1); i <= uint64(n); i++ {
 		acc, _ := genExternallyOwnedAccount(i, big.NewInt(int64(i)))
-		pa := account.GetProgramAccount(acc)
-		zeroHash := common.Hash{}
-		if pa.GetStorageRoot().Unextend() == zeroHash {
-			pa.SetStorageRoot(emptyRoot.Extend())
-		}
 		serializer := account.NewAccountSerializerWithAccount(acc)
 		value, _ := rlp.EncodeToBytes(serializer)
 		key := key32(i)
@@ -1674,7 +1669,7 @@ func TestSyncAccountPerformance(t *testing.T) {
 	// sync cycle starts. When popping the queue, we do not look it up again.
 	// Doing so would bring this number down to zero in this artificial testcase,
 	// but only add extra IO for no reason in practice.
-	if have, want := src.nTrienodeRequests, 1; have != want {
+	if have, want := src.nTrienodeRequests, 3; have != want {
 		fmt.Printf(src.Stats())
 		t.Errorf("trie node heal requests wrong, want %d, have %d", want, have)
 	}

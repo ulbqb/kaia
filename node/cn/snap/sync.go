@@ -1915,11 +1915,6 @@ func (s *Syncer) processStorageResponse(res *storageResponse) {
 			if pacc == nil {
 				continue
 			}
-			root := pacc.GetStorageRoot().Unextend()
-			zeroHash := common.Hash{}
-			if root == zeroHash {
-				pacc.SetStorageRoot(emptyRoot.Extend())
-			}
 			// If the packet contains multiple contract storage slots, all
 			// but the last are surely complete. The last contract may be
 			// chunked, so check it's continuation flag.
