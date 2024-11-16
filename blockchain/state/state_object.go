@@ -176,6 +176,11 @@ func (s *stateObject) getStorageTrie(db Database) Trie {
 	if s.storageTrie == nil {
 		if acc := account.GetProgramAccount(s.account); acc != nil {
 			var err error
+			root := acc.GetStorageRoot().Unextend()
+			zeroHash := common.Hash{}
+			if root == zeroHash {
+				acc.SetStorageRoot(emptyRoot.Extend())
+			}
 			s.storageTrie, err = s.openStorageTrie(acc.GetStorageRoot(), db)
 			if err != nil {
 				s.storageTrie, _ = s.openStorageTrie(common.ExtHash{}, db)
@@ -304,7 +309,7 @@ func (s *stateObject) SetStorage(storage map[common.Hash]common.Hash) {
 // IsContractAccount returns true is the account has a non-empty codeHash.
 func (s *stateObject) IsContractAccount() bool {
 	acc := account.GetProgramAccount(s.account)
-	if acc != nil && !bytes.Equal(acc.GetCodeHash(), emptyCodeHash) {
+	if acc != nil && acc.Type() == account.SmartContractAccountType {
 		return true
 	}
 	return false

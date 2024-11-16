@@ -493,6 +493,15 @@ func (s *StateDB) SetCode(addr common.Address, code []byte) error {
 	return nil
 }
 
+func (s *StateDB) SetCodeToEOA(addr common.Address, code []byte) error {
+	stateObject := s.GetOrNewStateObject(addr)
+	if stateObject != nil {
+		return stateObject.SetCode(crypto.Keccak256Hash(code), code)
+	}
+
+	return nil
+}
+
 func (s *StateDB) SetState(addr common.Address, key, value common.Hash) {
 	stateObject := s.GetOrNewSmartContract(addr)
 	if stateObject != nil {
@@ -1095,7 +1104,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 			// and just mark it for deletion in the trie.
 			s.deleteStateObject(stateObject)
 		case isDirty:
-			if stateObject.IsProgramAccount() {
+			if stateObject.IsProgramAccount() && stateObject.account.Type() == account.SmartContractAccountType {
 				// Write any contract code associated with the state object.
 				if stateObject.code != nil && stateObject.dirtyCode {
 					s.db.TrieDB().DiskDB().WriteCode(common.BytesToHash(stateObject.CodeHash()), stateObject.code)
@@ -1129,6 +1138,11 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 		}
 		acc := serializer.GetAccount()
 		if pa := account.GetProgramAccount(acc); pa != nil {
+			root := pa.GetStorageRoot().Unextend()
+			zeroHash := common.Hash{}
+			if root == zeroHash {
+				pa.SetStorageRoot(emptyRoot.Extend())
+			}
 			if pa.GetStorageRoot().Unextend() != emptyState {
 				s.db.TrieDB().Reference(pa.GetStorageRoot(), parent)
 			}
@@ -1156,7 +1170,6 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 		}
 		s.snap, s.snapDestructs, s.snapAccounts, s.snapStorage = nil, nil, nil, nil
 	}
-
 	return root, err
 }
 

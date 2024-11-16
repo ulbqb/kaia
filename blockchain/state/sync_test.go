@@ -296,6 +296,12 @@ func testIterativeStateSync(t *testing.T, count int, commit bool, bypath bool) {
 				}
 				acc := serializer.GetAccount()
 				pacc := account.GetProgramAccount(acc)
+				root := pacc.GetStorageRoot().Unextend()
+				zeroHash := common.Hash{}
+				if root == zeroHash {
+					pacc.SetStorageRoot(emptyRoot.Extend())
+				}
+
 				if pacc == nil {
 					t.Errorf("failed to get contract")
 				}

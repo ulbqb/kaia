@@ -1889,6 +1889,7 @@ func (dbm *databaseManager) ReadPreimage(hash common.Hash) []byte {
 }
 
 func (dbm *databaseManager) ReadTrieNodeFromNew(hash common.ExtHash) ([]byte, error) {
+	fmt.Printf("FIXME: dbm.GetStateTrieMigrationDB=%v\n", dbm.GetStateTrieMigrationDB())
 	return dbm.GetStateTrieMigrationDB().Get(TrieNodeKey(hash))
 }
 
