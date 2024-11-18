@@ -99,20 +99,47 @@ type stEnvMarshaling struct {
 //go:generate gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
 
 type stTransaction struct {
-	GasPrice   *big.Int `json:"gasPrice"`
-	Nonce      uint64   `json:"nonce"`
-	To         string   `json:"to"`
-	Data       []string `json:"data"`
-	GasLimit   []uint64 `json:"gasLimit"`
-	Value      []string `json:"value"`
-	PrivateKey []byte   `json:"secretKey"`
+	GasPrice             *big.Int           `json:"gasPrice"`
+	MaxFeePerGas         *big.Int           `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *big.Int           `json:"maxPriorityFeePerGas"`
+	Nonce                uint64             `json:"nonce"`
+	To                   string             `json:"to"`
+	Data                 []string           `json:"data"`
+	GasLimit             []uint64           `json:"gasLimit"`
+	Value                []string           `json:"value"`
+	PrivateKey           []byte             `json:"secretKey"`
+	AuthorizationList    []*stAuthorization `json:"authorizationList"`
 }
 
 type stTransactionMarshaling struct {
-	GasPrice   *math.HexOrDecimal256
-	Nonce      math.HexOrDecimal64
-	GasLimit   []math.HexOrDecimal64
-	PrivateKey hexutil.Bytes
+	GasPrice             *math.HexOrDecimal256
+	MaxFeePerGas         *math.HexOrDecimal256
+	MaxPriorityFeePerGas *math.HexOrDecimal256
+	Nonce                math.HexOrDecimal64
+	GasLimit             []math.HexOrDecimal64
+	PrivateKey           hexutil.Bytes
+}
+
+//go:generate gencodec -type stAuthorization -field-override stAuthorizationMarshaling -out gen_stauthorization.go
+
+// Authorization is an authorization from an account to deploy code at it's
+// address.
+type stAuthorization struct {
+	ChainID *big.Int
+	Address common.Address `json:"address" gencodec:"required"`
+	Nonce   uint64         `json:"nonce" gencodec:"required"`
+	V       *big.Int       `json:"v" gencodec:"required"`
+	R       *big.Int       `json:"r" gencodec:"required"`
+	S       *big.Int       `json:"s" gencodec:"required"`
+}
+
+// field type overrides for gencodec
+type stAuthorizationMarshaling struct {
+	ChainID *math.HexOrDecimal256
+	Nonce   math.HexOrDecimal64
+	V       *math.HexOrDecimal256
+	R       *math.HexOrDecimal256
+	S       *math.HexOrDecimal256
 }
 
 // getVMConfig takes a fork definition and returns a chain config.
@@ -274,12 +301,45 @@ func (tx *stTransaction) toMessage(ps stPostState, r params.Rules) (blockchain.M
 		return nil, fmt.Errorf("invalid tx data %q", dataHex)
 	}
 
-	intrinsicGas, err := types.IntrinsicGas(data, nil, nil, to == nil, r)
+	var authorizationList types.AuthorizationList
+	if tx.AuthorizationList != nil {
+		authorizationList = make(types.AuthorizationList, 0)
+		for _, auth := range tx.AuthorizationList {
+			authorizationList = append(authorizationList, types.Authorization{
+				ChainID: auth.ChainID,
+				Address: auth.Address,
+				Nonce:   auth.Nonce,
+				V:       auth.V,
+				R:       auth.R,
+				S:       auth.S,
+			})
+		}
+	}
+
+	intrinsicGas, err := types.IntrinsicGas(data, nil, authorizationList, to == nil, r)
 	if err != nil {
 		return nil, err
 	}
 
-	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, data, true, intrinsicGas, nil)
+	var msg *types.Transaction
+	if authorizationList != nil {
+		msg, err = types.NewTransactionWithMap(types.TxTypeEthereumSetCode, map[types.TxValueKeyType]interface{}{
+			types.TxValueKeyNonce:             tx.Nonce,
+			types.TxValueKeyTo:                to,
+			types.TxValueKeyAmount:            value,
+			types.TxValueKeyData:              data,
+			types.TxValueKeyGasLimit:          gasLimit,
+			types.TxValueKeyGasFeeCap:         tx.MaxFeePerGas,
+			types.TxValueKeyGasTipCap:         tx.MaxPriorityFeePerGas,
+			types.TxValueKeyAuthorizationList: authorizationList,
+			types.TxValueKeyChainID:           big.NewInt(1),
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		msg = types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, data, true, intrinsicGas, nil)
+	}
 	return msg, nil
 }
 
