@@ -404,3 +404,7 @@ func enable7702(jt *JumpTable) {
 	jt[DELEGATECALL].constantGas = params.WarmStorageReadCostEIP2929
 	jt[DELEGATECALL].dynamicGas = gasDelegateCallEIP7702
 }
+
+func ChangeGasCostForTest(jt *JumpTable, opCode OpCode, constantGas uint64) {
+	jt[opCode].constantGas = constantGas
+}

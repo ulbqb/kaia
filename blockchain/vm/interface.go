@@ -111,4 +111,6 @@ type StateDB interface {
 	GetKey(address common.Address) accountkey.AccountKey
 
 	GetAccount(address common.Address) account.Account
+
+	Finalise(bool, bool)
 }
