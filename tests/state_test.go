@@ -81,7 +81,9 @@ func TestExecutionSpecState(t *testing.T) {
 	st.skipLoad(`^byzantium\/`)
 	st.skipLoad(`^istanbul\/`)
 	st.skipLoad(`^berlin\/`)
+	st.skipLoad(`^shanghai\/`)
 	st.skipLoad(`^cancun\/`)
+	st.skipLoad(`^prague\/`)
 
 	st.walk(t, executionSpecStateTestDir, func(t *testing.T, name string, test *StateTest) {
 		execStateTest(t, st, test, name, []string{

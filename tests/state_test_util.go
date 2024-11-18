@@ -364,25 +364,7 @@ func (tx *stTransaction) toMessage(ps stPostState, r params.Rules, isTestExecuti
 		}
 	}
 
-	var msg *types.Transaction
-	if authorizationList != nil {
-		msg, err = types.NewTransactionWithMap(types.TxTypeEthereumSetCode, map[types.TxValueKeyType]interface{}{
-			types.TxValueKeyNonce:             tx.Nonce,
-			types.TxValueKeyTo:                to,
-			types.TxValueKeyAmount:            value,
-			types.TxValueKeyData:              data,
-			types.TxValueKeyGasLimit:          gasLimit,
-			types.TxValueKeyGasFeeCap:         tx.MaxFeePerGas,
-			types.TxValueKeyGasTipCap:         tx.MaxPriorityFeePerGas,
-			types.TxValueKeyAuthorizationList: authorizationList,
-			types.TxValueKeyChainID:           big.NewInt(1),
-		})
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		msg = types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, data, true, intrinsicGas, nil)
-	}
+	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, true, intrinsicGas, nil, authorizationList)
 	return msg, nil
 }
 
