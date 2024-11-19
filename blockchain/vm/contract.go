@@ -23,6 +23,7 @@
 package vm
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/holiman/uint256"
@@ -173,6 +174,7 @@ func (c *Contract) UseGas(gas uint64) (ok bool) {
 		return false
 	}
 	c.Gas -= gas
+	fmt.Printf("addr %s consume gas %v, left gas %v\n", c.CodeAddr.String(), gas, c.Gas)
 	return true
 }
 

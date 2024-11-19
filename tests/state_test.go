@@ -97,7 +97,7 @@ func TestExecutionSpecState(t *testing.T) {
 			"London",
 			"Merge",
 			"Shanghai",
-			// "Cancun",
+			"Cancun",
 			// "Prague",
 		}, true)
 	})

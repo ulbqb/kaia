@@ -350,6 +350,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		return nil, ErrIntrinsicGas
 	}
 	st.gas -= amount
+	fmt.Printf("intrinsic gas %v, left gas %v\n", amount, st.gas)
 
 	// Check clause 6
 	if msg.Value().Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.ValidatedSender(), msg.Value()) {
@@ -368,20 +369,27 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// - reset transient storage(eip 1153)
 	st.state.Prepare(rules, msg.ValidatedSender(), msg.ValidatedFeePayer(), st.evm.Context.Coinbase, msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 
+	if msg.Type() == types.TxTypeEthereumSetCode {
+		st.state.IncNonce(msg.ValidatedSender())
+	}
+
 	// Check authorizations list validity.
 	if msg.AuthorizationList() != nil {
 		for _, auth := range msg.AuthorizationList() {
 			// Verify chain ID is 0 or equal to current chain ID.
-			if auth.ChainID != big.NewInt(0) && st.evm.ChainConfig().ChainID != auth.ChainID {
+			if auth.ChainID.Sign() != 0 && st.evm.ChainConfig().ChainID != auth.ChainID {
+				fmt.Println("1", auth.ChainID, st.evm.ChainConfig().ChainID, auth.ChainID != big.NewInt(0))
 				continue
 			}
 			// Limit nonce to 2^64-1 per EIP-2681.
 			if auth.Nonce+1 < auth.Nonce {
+				fmt.Println("2")
 				continue
 			}
 			// Validate signature values and recover authority.
 			authority, err := auth.Authority()
 			if err != nil {
+				fmt.Println("3")
 				continue
 			}
 			// Check the authority account 1) doesn't have code or has exisiting
@@ -389,9 +397,11 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			st.state.AddAddressToAccessList(authority)
 			code := st.state.GetCode(authority)
 			if _, ok := types.ParseDelegation(code); len(code) != 0 && !ok {
+				fmt.Println("4")
 				continue
 			}
 			if have := st.state.GetNonce(authority); have != auth.Nonce {
+				fmt.Println("5", have, auth.Nonce)
 				continue
 			}
 			// If the account already exists in state, refund the new account cost
@@ -399,6 +409,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			if exists := st.state.Exist(authority); exists {
 				// If the account is not AccountKeyTypeLegacy, setcode is not allowed.
 				if !st.state.GetKey(authority).Type().IsLegacyAccountKey() {
+					fmt.Println("6")
 					continue
 				}
 				st.state.AddRefund(params.CallNewAccountGas - params.TxAuthTupleGas)
@@ -434,6 +445,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		vmerr error
 	)
 	ret, st.gas, vmerr = msg.Execute(st.evm, st.state, st.evm.Context.BlockNumber.Uint64(), st.gas, st.value)
+	fmt.Println("L530 ", st.gasUsed())
 
 	// These tx types does not enter the EVM in the msg.Execute() method. For the purpose of debug traces,
 	// those tx types are considered as a harmless zero-value transfer to sender itself. This aligns with
@@ -462,6 +474,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.refundGas(params.RefundQuotient)
 	}
 
+	fmt.Println("refunded ", st.gasUsed())
+
 	// Defer transferring Tx fee when DeferredTxFee is true
 	if st.evm.ChainConfig().Governance == nil || !st.evm.ChainConfig().Governance.DeferredTxFee() {
 		if rules.IsMagma {
@@ -470,6 +484,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
 		}
 	}
+
+	fmt.Printf("total used gas: %v\n", st.gasUsed())
 
 	return &ExecutionResult{
 		UsedGas:           st.gasUsed(),
@@ -550,6 +566,7 @@ func (st *StateTransition) refundGas(refundQuotient uint64) {
 		refund = st.state.GetRefund()
 	}
 	st.gas += refund
+	fmt.Println("L569 ", st.gasUsed())
 
 	// Return KAIA for remaining gas, exchanged at the original rate.
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)

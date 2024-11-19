@@ -496,7 +496,7 @@ func (t *TxInternalDataEthereumSetCode) Execute(sender ContractRef, vm VM, state
 	//	logger.Debug("[TxInternalDataLegacy] EVM execution done", "elapsed", elapsed)
 	//}()
 	///////////////////////////////////////////////////////
-	stateDB.IncNonce(sender.Address())
+	// stateDB.IncNonce(sender.Address())
 	return vm.Call(sender, t.Recipient, t.Payload, gas, value)
 }
 

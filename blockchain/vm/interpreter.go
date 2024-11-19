@@ -242,6 +242,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte) (ret []byte, err
 
 		// Static portion of gas
 		cost = operation.constantGas // For tracing
+		fmt.Println(op.String(), cost)
 		if !contract.UseGas(operation.constantGas) {
 			return nil, kerrors.ErrOutOfGas
 		}

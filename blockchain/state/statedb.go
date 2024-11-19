@@ -503,6 +503,7 @@ func (s *StateDB) SetCodeToEOA(addr common.Address, code []byte) error {
 }
 
 func (s *StateDB) SetState(addr common.Address, key, value common.Hash) {
+	fmt.Printf("%x %x %x\n", addr, key, value)
 	stateObject := s.GetOrNewSmartContract(addr)
 	if stateObject != nil {
 		stateObject.SetState(s.db, key, value)
@@ -1104,7 +1105,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 			// and just mark it for deletion in the trie.
 			s.deleteStateObject(stateObject)
 		case isDirty:
-			if stateObject.IsProgramAccount() && stateObject.account.Type() == account.SmartContractAccountType {
+			if stateObject.IsProgramAccount() {
 				// Write any contract code associated with the state object.
 				if stateObject.code != nil && stateObject.dirtyCode {
 					s.db.TrieDB().DiskDB().WriteCode(common.BytesToHash(stateObject.CodeHash()), stateObject.code)
