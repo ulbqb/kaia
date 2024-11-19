@@ -377,7 +377,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if msg.AuthorizationList() != nil {
 		for _, auth := range msg.AuthorizationList() {
 			// Verify chain ID is 0 or equal to current chain ID.
-			if auth.ChainID.Sign() != 0 && st.evm.ChainConfig().ChainID != auth.ChainID {
+			if auth.ChainID.Sign() != 0 && st.evm.ChainConfig().ChainID.Cmp(auth.ChainID) != 0 {
 				fmt.Println("1", auth.ChainID, st.evm.ChainConfig().ChainID, auth.ChainID != big.NewInt(0))
 				continue
 			}
