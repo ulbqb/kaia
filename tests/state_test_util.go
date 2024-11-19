@@ -102,16 +102,17 @@ type stEnvMarshaling struct {
 //go:generate gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
 
 type stTransaction struct {
-	GasPrice             *big.Int           `json:"gasPrice"`
-	MaxFeePerGas         *big.Int           `json:"maxFeePerGas"`
-	MaxPriorityFeePerGas *big.Int           `json:"maxPriorityFeePerGas"`
-	Nonce                uint64             `json:"nonce"`
-	To                   string             `json:"to"`
-	Data                 []string           `json:"data"`
-	GasLimit             []uint64           `json:"gasLimit"`
-	Value                []string           `json:"value"`
-	PrivateKey           []byte             `json:"secretKey"`
-	AuthorizationList    []*stAuthorization `json:"authorizationList"`
+	GasPrice             *big.Int            `json:"gasPrice"`
+	MaxFeePerGas         *big.Int            `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *big.Int            `json:"maxPriorityFeePerGas"`
+	Nonce                uint64              `json:"nonce"`
+	To                   string              `json:"to"`
+	Data                 []string            `json:"data"`
+	AccessLists          []*types.AccessList `json:"accessLists,omitempty"`
+	GasLimit             []uint64            `json:"gasLimit"`
+	Value                []string            `json:"value"`
+	PrivateKey           []byte              `json:"secretKey"`
+	AuthorizationList    []*stAuthorization  `json:"authorizationList"`
 }
 
 type stTransactionMarshaling struct {
@@ -341,6 +342,11 @@ func (tx *stTransaction) toMessage(ps stPostState, r params.Rules, isTestExecuti
 		return nil, fmt.Errorf("invalid tx data %q", dataHex)
 	}
 
+	var accessList types.AccessList
+	if tx.AccessLists != nil && tx.AccessLists[ps.Indexes.Data] != nil {
+		accessList = *tx.AccessLists[ps.Indexes.Data]
+	}
+
 	var authorizationList types.AuthorizationList
 	if tx.AuthorizationList != nil {
 		authorizationList = make(types.AuthorizationList, 0)
@@ -358,12 +364,12 @@ func (tx *stTransaction) toMessage(ps stPostState, r params.Rules, isTestExecuti
 
 	var intrinsicGas uint64
 	if isTestExecutionSpecState {
-		intrinsicGas, err = useEthIntrinsicGas(data, authorizationList, to == nil, r)
+		intrinsicGas, err = useEthIntrinsicGas(data, accessList, authorizationList, to == nil, r)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		intrinsicGas, err = types.IntrinsicGas(data, nil, authorizationList, to == nil, r)
+		intrinsicGas, err = types.IntrinsicGas(data, accessList, authorizationList, to == nil, r)
 		if err != nil {
 			return nil, err
 		}
@@ -421,11 +427,11 @@ func useEthOpCodeGas(r params.Rules, evm *vm.EVM) {
 	}
 }
 
-func useEthIntrinsicGas(data []byte, authorizationList types.AuthorizationList, contractCreation bool, r params.Rules) (uint64, error) {
+func useEthIntrinsicGas(data []byte, accessList types.AccessList, authorizationList types.AuthorizationList, contractCreation bool, r params.Rules) (uint64, error) {
 	if r.IsIstanbul {
 		r.IsPrague = true
 	}
-	return types.IntrinsicGas(data, nil, authorizationList, contractCreation, r)
+	return types.IntrinsicGas(data, accessList, authorizationList, contractCreation, r)
 }
 
 func useEthMiningReward(statedb *state.StateDB, evm *vm.EVM, tx *stTransaction, envBaseFee *big.Int, usedGas uint64, gasPrice *big.Int) {
