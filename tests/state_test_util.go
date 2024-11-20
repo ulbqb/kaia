@@ -375,7 +375,7 @@ func (tx *stTransaction) toMessage(ps stPostState, r params.Rules, isTestExecuti
 		}
 	}
 
-	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, true, intrinsicGas, nil, authorizationList)
+	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, true, intrinsicGas, accessList, authorizationList)
 	return msg, nil
 }
 
