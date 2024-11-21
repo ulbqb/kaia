@@ -593,6 +593,13 @@ func (evm *EVM) create(caller types.ContractRef, codeAndHash *codeAndHash, gas u
 		err = ErrInvalidCode
 	}
 
+	if err != nil && (evm.chainRules.IsIstanbul || err != ErrCodeStoreOutOfGas) {
+		evm.StateDB.RevertToSnapshot(snapshot)
+		if err != ErrExecutionReverted {
+			contract.UseGas(contract.Gas)
+		}
+	}
+
 	return ret, address, contract.Gas, err
 }
 
