@@ -129,19 +129,19 @@ type stTransactionMarshaling struct {
 // Authorization is an authorization from an account to deploy code at it's
 // address.
 type stAuthorization struct {
-	ChainID *big.Int
+	ChainID uint64
 	Address common.Address `json:"address" gencodec:"required"`
 	Nonce   uint64         `json:"nonce" gencodec:"required"`
-	V       *big.Int       `json:"v" gencodec:"required"`
+	V       uint8          `json:"v" gencodec:"required"`
 	R       *big.Int       `json:"r" gencodec:"required"`
 	S       *big.Int       `json:"s" gencodec:"required"`
 }
 
 // field type overrides for gencodec
 type stAuthorizationMarshaling struct {
-	ChainID *math.HexOrDecimal256
+	ChainID math.HexOrDecimal64
 	Nonce   math.HexOrDecimal64
-	V       *math.HexOrDecimal256
+	V       math.HexOrDecimal64
 	R       *math.HexOrDecimal256
 	S       *math.HexOrDecimal256
 }
@@ -257,6 +257,9 @@ func (t *StateTest) Run(subtest StateSubtest, vmconfig vm.Config, isTestExecutio
 		fmt.Println("dump ", string(statedb.Dump()))
 		return statedb, fmt.Errorf("post state root mismatch: got %x, want %x", root, post.Root)
 	}
+
+	// TODO-kaia-prague: check expectException
+
 	return statedb, nil
 }
 

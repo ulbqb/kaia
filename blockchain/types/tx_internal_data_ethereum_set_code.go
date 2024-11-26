@@ -569,10 +569,10 @@ func (t *TxInternalDataEthereumSetCode) setSignatureValues(chainID, v, r, s *big
 type AuthorizationList []Authorization
 
 type Authorization struct {
-	ChainID *big.Int       `json:"chainId"`
+	ChainID uint64         `json:"chainId"`
 	Address common.Address `json:"address"`
 	Nonce   uint64         `json:"nonce"`
-	V       *big.Int       `json:"v"`
+	V       uint8          `json:"v"`
 	R       *big.Int       `json:"r"`
 	S       *big.Int       `json:"s"`
 }
@@ -586,7 +586,7 @@ func (a Authorization) Authority() (common.Address, error) {
 			a.Nonce,
 		})
 
-	v := byte(a.V.Uint64())
+	v := byte(a.V)
 	if !crypto.ValidateSignatureValues(v, a.R, a.S, true) {
 		return common.Address{}, ErrInvalidSig
 	}

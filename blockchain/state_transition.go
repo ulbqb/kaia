@@ -377,8 +377,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if msg.AuthorizationList() != nil {
 		for _, auth := range msg.AuthorizationList() {
 			// Verify chain ID is 0 or equal to current chain ID.
-			if auth.ChainID.Sign() != 0 && st.evm.ChainConfig().ChainID.Cmp(auth.ChainID) != 0 {
-				fmt.Println("1", auth.ChainID, st.evm.ChainConfig().ChainID, auth.ChainID != big.NewInt(0))
+			if auth.ChainID != 0 && st.evm.ChainConfig().ChainID.Uint64() != auth.ChainID {
+				fmt.Println("1", auth.ChainID, st.evm.ChainConfig().ChainID, auth.ChainID != 0)
 				continue
 			}
 			// Limit nonce to 2^64-1 per EIP-2681.
