@@ -575,14 +575,6 @@ func (evm *EVM) create(caller types.ContractRef, codeAndHash *codeAndHash, gas u
 		}
 	}
 
-	// When an error was returned by the EVM or when setting the creation code
-	// above we revert to the snapshot and consume any gas remaining.
-	if maxCodeSizeExceeded || err != nil {
-		evm.StateDB.RevertToSnapshot(snapshot)
-		if err != ErrExecutionReverted {
-			contract.UseGas(contract.Gas)
-		}
-	}
 	// Assign err if contract code size exceeds the max while the err is still empty.
 	if maxCodeSizeExceeded && err == nil {
 		err = ErrMaxCodeSizeExceeded // TODO-Klaytn-Issue615
@@ -593,7 +585,7 @@ func (evm *EVM) create(caller types.ContractRef, codeAndHash *codeAndHash, gas u
 		err = ErrInvalidCode
 	}
 
-	if err != nil && (evm.chainRules.IsIstanbul || err != ErrCodeStoreOutOfGas) {
+	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
 			contract.UseGas(contract.Gas)
