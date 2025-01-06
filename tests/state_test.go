@@ -97,6 +97,7 @@ func (suite *ExecutionSpecStateTestSuite) TestExecutionSpecState() {
 	// unsupported EIPs
 	st.skipLoad(`^cancun\/eip4788_beacon_root\/`)
 	st.skipLoad(`^cancun\/eip4844_blobs\/`)
+	st.skipLoad(`^prague\/eip7623_increase_calldata_cost\/`)
 	// calculate the different consumed gas because 0x0a and 0x0b contract is set to access list by ActivePrecompiles in Cancun
 	st.skipLoad(`^prague\/eip2537_bls_12_381_precompiles\/bls12_precompiles_before_fork\/precompile_before_fork.json\/tests\/prague\/eip2537_bls_12_381_precompiles\/test_bls12_precompiles_before_fork.py::test_precompile_before_fork`)
 
