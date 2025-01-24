@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"reflect"
 
 	"github.com/kaiachain/kaia/blockchain"
 	"github.com/kaiachain/kaia/blockchain/state"
@@ -299,32 +300,65 @@ func makeBlockFromTxs(bc *blockchain.BlockChain, db database.DBManager, txs type
 
 func validateHeader(h *btHeader, h2 *types.Header) error {
 	if h.Bloom != h2.Bloom {
-		return fmt.Errorf("Bloom: want: %x have: %x", h.Bloom, h2.Bloom)
+		return fmt.Errorf("bloom: want: %x have: %x", h.Bloom, h2.Bloom)
 	}
+	// if h.Coinbase != h2.Coinbase {
+	// 	return fmt.Errorf("coinbase: want: %x have: %x", h.Coinbase, h2.Coinbase)
+	// }
+	// if h.MixHash != h2.MixDigest {
+	// 	return fmt.Errorf("MixHash: want: %x have: %x", h.MixHash, h2.MixDigest)
+	// }
+	// if h.Nonce != h2.Nonce {
+	// 	return fmt.Errorf("nonce: want: %x have: %x", h.Nonce, h2.Nonce)
+	// }
 	if h.Number.Cmp(h2.Number) != 0 {
-		return fmt.Errorf("Number: want: %v have: %v", h.Number, h2.Number)
+		return fmt.Errorf("number: want: %v have: %v", h.Number, h2.Number)
 	}
 	if h.ParentHash != h2.ParentHash {
-		return fmt.Errorf("Parent hash: want: %x have: %x", h.ParentHash, h2.ParentHash)
+		return fmt.Errorf("parent hash: want: %x have: %x", h.ParentHash, h2.ParentHash)
 	}
 	if h.ReceiptTrie != h2.ReceiptHash {
-		return fmt.Errorf("Receipt hash: want: %x have: %x", h.ReceiptTrie, h2.ReceiptHash)
+		return fmt.Errorf("receipt hash: want: %x have: %x", h.ReceiptTrie, h2.ReceiptHash)
 	}
 	if h.TransactionsTrie != h2.TxHash {
-		return fmt.Errorf("Tx hash: want: %x have: %x", h.TransactionsTrie, h2.TxHash)
+		return fmt.Errorf("tx hash: want: %x have: %x", h.TransactionsTrie, h2.TxHash)
 	}
 	if h.StateRoot != h2.Root {
-		return fmt.Errorf("State hash: want: %x have: %x", h.StateRoot, h2.Root)
+		return fmt.Errorf("state hash: want: %x have: %x", h.StateRoot, h2.Root)
 	}
+	// if h.UncleHash != h2.UncleHash {
+	// 	return fmt.Errorf("uncle hash: want: %x have: %x", h.UncleHash, h2.UncleHash)
+	// }
 	if !bytes.Equal(h.ExtraData, h2.Extra) {
-		return fmt.Errorf("Extra data: want: %x have: %x", h.ExtraData, h2.Extra)
+		return fmt.Errorf("extra data: want: %x have: %x", h.ExtraData, h2.Extra)
 	}
+	// if h.Difficulty.Cmp(h2.Difficulty) != 0 {
+	// 	return fmt.Errorf("difficulty: want: %v have: %v", h.Difficulty, h2.Difficulty)
+	// }
+	// if h.GasLimit != h2.GasLimit {
+	// 	return fmt.Errorf("gasLimit: want: %d have: %d", h.GasLimit, h2.GasLimit)
+	// }
 	if h.GasUsed != h2.GasUsed {
-		return fmt.Errorf("GasUsed: want: %d have: %d", h.GasUsed, h2.GasUsed)
+		return fmt.Errorf("gasUsed: want: %d have: %d", h.GasUsed, h2.GasUsed)
 	}
-	if h.Timestamp != h2.Time.Uint64() {
-		return fmt.Errorf("TimestampGa: want: %v have: %v", h.Timestamp, h2.Time)
+	if new(big.Int).SetUint64(h.Timestamp) != h2.Time {
+		return fmt.Errorf("timestamp: want: %v have: %v", h.Timestamp, h2.Time)
 	}
+	if !reflect.DeepEqual(h.BaseFeePerGas, h2.BaseFee) {
+		return fmt.Errorf("baseFeePerGas: want: %v have: %v", h.BaseFeePerGas, h2.BaseFee)
+	}
+	// if !reflect.DeepEqual(h.WithdrawalsRoot, h2.WithdrawalsHash) {
+	// 	return fmt.Errorf("withdrawalsRoot: want: %v have: %v", h.WithdrawalsRoot, h2.WithdrawalsHash)
+	// }
+	// if !reflect.DeepEqual(h.BlobGasUsed, h2.BlobGasUsed) {
+	// 	return fmt.Errorf("blobGasUsed: want: %v have: %v", h.BlobGasUsed, h2.BlobGasUsed)
+	// }
+	// if !reflect.DeepEqual(h.ExcessBlobGas, h2.ExcessBlobGas) {
+	// 	return fmt.Errorf("excessBlobGas: want: %v have: %v", h.ExcessBlobGas, h2.ExcessBlobGas)
+	// }
+	// if !reflect.DeepEqual(h.ParentBeaconBlockRoot, h2.ParentBeaconRoot) {
+	// 	return fmt.Errorf("parentBeaconBlockRoot: want: %v have: %v", h.ParentBeaconBlockRoot, h2.ParentBeaconRoot)
+	// }
 	return nil
 }
 
@@ -458,3 +492,9 @@ func (bb *btBlock) decode() (types.Transactions, TestHeader, error) {
 
 	return txs, header, nil
 }
+
+// HYODO TODO:
+// - remove testHeader
+// - check comment out test
+// - check any other difference from eth
+// - check if there are what should be tested about value of kaia header in validateHeader
