@@ -111,6 +111,61 @@ type btHeaderMarshaling struct {
 	ExcessBlobGas *math.HexOrDecimal64
 }
 
+type TestHeader struct {
+	ParentHash       common.Hash
+	UncleHash        common.Hash
+	Coinbase         []byte
+	Root             common.Hash
+	TxHash           common.Hash
+	ReceiptHash      common.Hash
+	Bloom            types.Bloom
+	Difficulty       *big.Int
+	Number           *big.Int
+	GasLimit         uint64
+	GasUsed          uint64
+	Time             *big.Int
+	Extra            []byte
+	MixHash          common.Hash
+	Nonce            []byte
+	BaseFee          *big.Int     `rlp:"optional"`
+	WithdrawalsHash  *common.Hash `rlp:"optional"`
+	BlobGasUsed      *uint64      `rlp:"optional"`
+	ExcessBlobGas    *uint64      `rlp:"optional"`
+	ParentBeaconRoot *common.Hash `rlp:"optional"`
+	RequestsHash     *common.Hash `rlp:"optional"`
+}
+
+type eestEngine struct {
+	*gxhash.Gxhash
+	baseFee *big.Int
+}
+
+var _ consensus.Engine = &eestEngine{}
+
+func (e *eestEngine) Initialize(chain consensus.ChainReader, header *types.Header, state *state.StateDB) {
+	if chain.Config().IsPragueForkEnabled(header.Number) {
+		context := blockchain.NewEVMBlockContext(header, chain, nil)
+		vmenv := vm.NewEVM(context, vm.TxContext{}, state, chain.Config(), &vm.Config{})
+		blockchain.ProcessParentBlockHash(header, vmenv, state, chain.Config().Rules(header.Number))
+	}
+}
+
+func (e *eestEngine) BeforeApplyMessage(evm *vm.EVM, msg blockchain.Message) {
+	// change opcode
+	// change intrinsic gas
+	// change gas limit
+	// change gas price by e.baseFee
+}
+
+func (e *eestEngine) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
+	// change reward process
+	return e.Gxhash.Finalize(chain, header, state, txs, receipts)
+}
+
+func (e *eestEngine) applyHeader(h TestHeader) {
+	e.baseFee = h.BaseFee
+}
+
 func (t *BlockTest) Run() error {
 	config, ok := Forks[t.json.Network]
 	if !ok {
@@ -146,19 +201,14 @@ func (t *BlockTest) Run() error {
 		return fmt.Errorf("genesis block state root does not match test: computed=%x, test=%x", gblock.Root().Bytes()[:6], t.json.Genesis.StateRoot[:6])
 	}
 
-	// TODO-Kaia: Replace gxhash with istanbul
 	tracer := vm.NewStructLogger(nil)
-	engine := &eestEngine{
-		Gxhash:        gxhash.NewShared(),
-		preInitialize: nil,
-	}
-	chain, err := blockchain.NewBlockChain(db, nil, config, engine, vm.Config{Debug: true, Tracer: tracer, ComputationCostLimit: params.OpcodeComputationCostLimitInfinite})
+	chain, err := blockchain.NewBlockChain(db, nil, config, &eestEngine{Gxhash: gxhash.NewShared()}, vm.Config{Debug: true, Tracer: tracer, ComputationCostLimit: params.OpcodeComputationCostLimitInfinite})
 	if err != nil {
 		return err
 	}
 	defer chain.Stop()
 
-	_, rewardMap, senderMap, err := t.insertBlocks(chain, *gblock, db)
+	_, err = t.insertBlocks(chain, *gblock, db)
 	if err != nil {
 		return err
 	}
@@ -167,7 +217,7 @@ func (t *BlockTest) Run() error {
 	if err != nil {
 		return err
 	}
-	if err = t.validatePostState(newDB, rewardMap, senderMap); err != nil {
+	if err = t.validatePostState(newDB); err != nil {
 		return fmt.Errorf("post state validation failed: %v", err)
 	}
 	// Cross-check the snapshot-to-hash against the trie hash
@@ -192,15 +242,8 @@ func (t *BlockTest) genesis(config *params.ChainConfig) *blockchain.Genesis {
 	}
 }
 
-type rewardList struct {
-	kaiaReward *big.Int
-	ethReward  *big.Int
-}
-
-func (t *BlockTest) insertBlocks(bc *blockchain.BlockChain, gBlock types.Block, db database.DBManager) ([]btBlock, map[common.Address]rewardList, map[common.Address]*big.Int, error) {
+func (t *BlockTest) insertBlocks(bc *blockchain.BlockChain, gBlock types.Block, db database.DBManager) ([]btBlock, error) {
 	validBlocks := make([]btBlock, 0)
-	rewardMap := map[common.Address]rewardList{}
-	senderMap := map[common.Address]*big.Int{}
 	preBlock := &gBlock
 
 	// insert the test blocks, which will execute all transactions
@@ -210,84 +253,21 @@ func (t *BlockTest) insertBlocks(bc *blockchain.BlockChain, gBlock types.Block, 
 			if b.BlockHeader == nil {
 				continue // OK - block is supposed to be invalid, continue with next block
 			} else {
-				return nil, nil, nil, fmt.Errorf("Block RLP decoding failed when expected to succeed: %v", err)
+				return nil, fmt.Errorf("Block RLP decoding failed when expected to succeed: %v", err)
 			}
 		}
 
-		// make Kaia block executing txs
-		// //
-		// // RLP decoding worked, try to insert into chain:
-		// kaiaReward := common.Big0
-		// ethReward := common.Big0
+		if e := bc.Engine().(interface{ applyHeader(TestHeader) }); e != nil {
+			e.applyHeader(header)
+		}
 
-		// // The intrinsic gas calculation affects gas used, so we need to make some changes to the main code.
-		// if bc.Config().IsIstanbulForkEnabled(bc.CurrentHeader().Number) {
-		// 	types.IsPragueInExecutionSpecTest = true
-		// }
-		// blockchain.GasLimitInExecutionSpecTest = header.GasLimit
-
-		// // var maxFeePerGas *big.Int
-		// blocks, receiptsList := blockchain.GenerateChain(bc.Config(), preBlock, bc.Engine(), db, 1, func(i int, b *blockchain.BlockGen) {
-		// 	b.SetRewardbase(common.Address(header.Coinbase))
-		// 	for _, tx := range txs {
-		// 		b.AddTxWithChainEvenHasError(bc, tx)
-		// 	}
-		// })
-		// preBlock = blocks[0]
-
-		// // The reward calculation is different for kaia and eth, and this will be deducted from the state later.
-		// for _, receipt := range receiptsList[0] {
-		// 	for _, tx := range blocks[0].Body().Transactions {
-		// 		if tx.Hash() != receipt.TxHash {
-		// 			continue
-		// 		}
-
-		// 		// kaia gas price
-		// 		var kaiaGasPrice *big.Int
-		// 		if tx.Type() == types.TxTypeEthereumDynamicFee || tx.Type() == types.TxTypeEthereumSetCode {
-		// 			kaiaGasPrice = tx.EffectiveGasPrice(blocks[0].Header(), bc.Config())
-		// 		} else {
-		// 			kaiaGasPrice = tx.GasPrice()
-		// 		}
-
-		// 		// eth gas price
-		// 		ethGasPrice := tx.GasPrice()
-		// 		if header.BaseFee != nil {
-		// 			ethGasPrice = math.BigMin(new(big.Int).Add(tx.GasTipCap(), header.BaseFee), tx.GasFeeCap())
-		// 		}
-
-		// 		// Record kaia's reward.
-		// 		kaiaReward = new(big.Int).Add(kaiaReward, new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), kaiaGasPrice))
-
-		// 		// Record eth's reward.
-		// 		ethReward = new(big.Int).Add(ethReward, calculateEthMiningReward(ethGasPrice, tx.GasFeeCap(), tx.GasTipCap(), header.BaseFee,
-		// 			receipt.GasUsed, bc.Config().Rules(blocks[0].Header().Number)))
-
-		// 		// Because it is a eth test, we don't have to think about fee payer
-		// 		// Because the baseFee is set to 0, Kaia's gas fee may be 0 if the transaction has a dynamic fee.
-		// 		senderMap[tx.ValidatedSender()] = new(big.Int).Sub(
-		// 			new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), kaiaGasPrice),
-		// 			new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), ethGasPrice))
-		// 	}
-		// }
-
-		// if header.GasUsed != blocks[0].GasUsed() {
-		// 	return nil, nil, nil, fmt.Errorf("Unexpected GasUsed error (Expected: %v, Actual: %v)", header.GasUsed, blocks[0].GasUsed())
-		// }
-
-		// rewardMap[common.Address(header.Coinbase)] = rewardList{
-		// 	kaiaReward: kaiaReward,
-		// 	ethReward:  ethReward,
-		// }
-		//
-		//
 		blocks := makeBlockFromTxs(bc, db, txs, header, preBlock)
 		i, err := bc.InsertChain(blocks)
 		if err != nil {
 			if b.BlockHeader == nil {
 				continue // OK - block is supposed to be invalid, continue with next block
 			} else {
-				return nil, nil, nil, fmt.Errorf("Block #%v insertion into chain failed: %v", blocks[i].Number(), err)
+				return nil, fmt.Errorf("Block #%v insertion into chain failed: %v", blocks[i].Number(), err)
 			}
 		}
 		if b.BlockHeader == nil {
@@ -295,7 +275,7 @@ func (t *BlockTest) insertBlocks(bc *blockchain.BlockChain, gBlock types.Block, 
 				fmt.Fprintf(os.Stderr, "block (index %d) insertion should have failed due to: %v:\n%v\n",
 					bi, b.ExpectException, string(data))
 			}
-			return nil, nil, nil, fmt.Errorf("block (index %d) insertion should have failed due to: %v", bi, b.ExpectException)
+			return nil, fmt.Errorf("block (index %d) insertion should have failed due to: %v", bi, b.ExpectException)
 		}
 
 		// validate RLP decoding by checking all values against test file JSON
@@ -304,7 +284,7 @@ func (t *BlockTest) insertBlocks(bc *blockchain.BlockChain, gBlock types.Block, 
 		// }
 		// validBlocks = append(validBlocks, b)
 	}
-	return validBlocks, rewardMap, senderMap, nil
+	return validBlocks, nil
 }
 
 func makeBlockFromTxs(bc *blockchain.BlockChain, db database.DBManager, txs types.Transactions, header TestHeader, preBlock *types.Block) []*types.Block {
@@ -313,11 +293,6 @@ func makeBlockFromTxs(bc *blockchain.BlockChain, db database.DBManager, txs type
 		types.IsPragueInExecutionSpecTest = true
 	}
 	blockchain.GasLimitInExecutionSpecTest = header.GasLimit
-
-	engine := bc.Engine().(*eestEngine)
-	engine.preInitialize = func(c consensus.ChainReader, h *types.Header, s *state.StateDB) {
-		h.BaseFee = header.BaseFee
-	}
 
 	// var maxFeePerGas *big.Int
 	blocks, _ := blockchain.GenerateChain(bc.Config(), preBlock, bc.Engine(), db, 1, func(i int, b *blockchain.BlockGen) {
@@ -360,19 +335,9 @@ func validateHeader(h *btHeader, h2 *types.Header) error {
 	return nil
 }
 
-func (t *BlockTest) validatePostState(statedb *state.StateDB, rewardMap map[common.Address]rewardList, senderMap map[common.Address]*big.Int) error {
+func (t *BlockTest) validatePostState(statedb *state.StateDB) error {
 	// validate post state accounts in test file against what we have in state db
 	for addr, acct := range t.json.Post {
-		if rewardList, exist := rewardMap[addr]; exist {
-			// In the case of rewardBaseAddress, the Kaia reward will be deducted once.
-			statedb.SubBalance(addr, rewardList.kaiaReward)
-			statedb.AddBalance(addr, rewardList.ethReward)
-		}
-
-		if senderGasAdjust, exist := senderMap[addr]; exist {
-			statedb.AddBalance(addr, senderGasAdjust)
-		}
-
 		// address is indirectly verified by the other fields, as it's the db key
 		code2 := statedb.GetCode(addr)
 		balance2 := statedb.GetBalance(addr)
@@ -388,7 +353,7 @@ func (t *BlockTest) validatePostState(statedb *state.StateDB, rewardMap map[comm
 		}
 	}
 
-	err := t.validateStorage(statedb, rewardMap)
+	err := t.validateStorage(statedb)
 	if err != nil {
 		return err
 	}
@@ -397,7 +362,7 @@ func (t *BlockTest) validatePostState(statedb *state.StateDB, rewardMap map[comm
 }
 
 // validateStorage validates storage while considering the difference between Kana and Ethereum.
-func (t *BlockTest) validateStorage(statedb *state.StateDB, rewardMap map[common.Address]rewardList) error {
+func (t *BlockTest) validateStorage(statedb *state.StateDB) error {
 	beaconRootsAddress := common.HexToAddress("0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02")     // EIP-4788
 	depositContractAddress := common.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa") // EIP-6110
 
@@ -406,10 +371,6 @@ func (t *BlockTest) validateStorage(statedb *state.StateDB, rewardMap map[common
 	statedb.ForEachAccount(func(addr common.Address, data account.Account) {
 		// skip test's rewardbase
 		if addr == params.AuthorAddressForTesting {
-			return
-		}
-		// skip rewardbase when reward is zero
-		if reward, ok := rewardMap[addr]; ok && reward.ethReward.Cmp(big.NewInt(0)) == 0 {
 			return
 		}
 		accountNum++
@@ -467,30 +428,6 @@ func (t *BlockTest) validateImportedHeaders(cm *blockchain.BlockChain, validBloc
 	return nil
 }
 
-type TestHeader struct {
-	ParentHash       common.Hash
-	UncleHash        common.Hash
-	Coinbase         []byte
-	Root             common.Hash
-	TxHash           common.Hash
-	ReceiptHash      common.Hash
-	Bloom            types.Bloom
-	Difficulty       *big.Int
-	Number           *big.Int
-	GasLimit         uint64
-	GasUsed          uint64
-	Time             *big.Int
-	Extra            []byte
-	MixHash          common.Hash
-	Nonce            []byte
-	BaseFee          *big.Int     `rlp:"optional"`
-	WithdrawalsHash  *common.Hash `rlp:"optional"`
-	BlobGasUsed      *uint64      `rlp:"optional"`
-	ExcessBlobGas    *uint64      `rlp:"optional"`
-	ParentBeaconRoot *common.Hash `rlp:"optional"`
-	RequestsHash     *common.Hash `rlp:"optional"`
-}
-
 // Modify the decode function
 func (bb *btBlock) decode() (types.Transactions, TestHeader, error) {
 	data, err := hexutil.Decode(bb.Rlp)
@@ -527,27 +464,4 @@ func (bb *btBlock) decode() (types.Transactions, TestHeader, error) {
 	}
 
 	return txs, header, nil
-}
-
-type eestEngine struct {
-	*gxhash.Gxhash
-	preInitialize func(consensus.ChainReader, *types.Header, *state.StateDB)
-}
-
-var _ consensus.Engine = &eestEngine{}
-
-func (e *eestEngine) Initialize(chain consensus.ChainReader, header *types.Header, state *state.StateDB) {
-	if e.preInitialize != nil {
-		e.preInitialize(chain, header, state)
-	}
-	if chain.Config().IsPragueForkEnabled(header.Number) {
-		context := blockchain.NewEVMBlockContext(header, chain, nil)
-		vmenv := vm.NewEVM(context, vm.TxContext{}, state, chain.Config(), &vm.Config{})
-		blockchain.ProcessParentBlockHash(header, vmenv, state, chain.Config().Rules(header.Number))
-	}
-}
-
-func (e *eestEngine) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
-	// change reward process
-	return e.Gxhash.Finalize(chain, header, state, txs, receipts)
 }

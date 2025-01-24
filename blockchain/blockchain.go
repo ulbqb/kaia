@@ -2781,6 +2781,10 @@ func (bc *BlockChain) ApplyTransaction(chainConfig *params.ChainConfig, author *
 		vm.ChangeGasCostForTest(&vmenv.Config.JumpTable, vm.EXTCODEHASH, params.WarmStorageReadCostEIP2929)
 	}
 
+	if e := bc.Engine().(interface{ BeforeApplyMessage(*vm.EVM, Message) }); e != nil {
+		e.BeforeApplyMessage(vmenv, msg)
+	}
+
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg)
 	if err != nil {
