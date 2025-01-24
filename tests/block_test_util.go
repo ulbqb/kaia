@@ -288,13 +288,6 @@ func (t *BlockTest) insertBlocks(bc *blockchain.BlockChain, gBlock types.Block, 
 }
 
 func makeBlockFromTxs(bc *blockchain.BlockChain, db database.DBManager, txs types.Transactions, header TestHeader, preBlock *types.Block) []*types.Block {
-	// The intrinsic gas calculation affects gas used, so we need to make some changes to the main code.
-	if bc.Config().IsIstanbulForkEnabled(bc.CurrentHeader().Number) {
-		types.IsPragueInExecutionSpecTest = true
-	}
-	blockchain.GasLimitInExecutionSpecTest = header.GasLimit
-
-	// var maxFeePerGas *big.Int
 	blocks, _ := blockchain.GenerateChain(bc.Config(), preBlock, bc.Engine(), db, 1, func(i int, b *blockchain.BlockGen) {
 		b.SetRewardbase(common.Address(header.Coinbase))
 		for _, tx := range txs {
