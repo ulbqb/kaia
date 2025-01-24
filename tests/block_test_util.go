@@ -148,14 +148,11 @@ func (t *BlockTest) Run() error {
 
 	// TODO-Kaia: Replace gxhash with istanbul
 	tracer := vm.NewStructLogger(nil)
-	gxhash.CustomInitialize = func(chain consensus.ChainReader, header *types.Header, state *state.StateDB) {
-		if chain.Config().IsPragueForkEnabled(header.Number) {
-			context := blockchain.NewEVMBlockContext(header, chain, nil)
-			vmenv := vm.NewEVM(context, vm.TxContext{}, state, chain.Config(), &vm.Config{})
-			blockchain.ProcessParentBlockHash(header, vmenv, state, chain.Config().Rules(header.Number))
-		}
+	engine := &eestEngine{
+		Gxhash:        gxhash.NewShared(),
+		preInitialize: nil,
 	}
-	chain, err := blockchain.NewBlockChain(db, nil, config, gxhash.NewShared(), vm.Config{Debug: true, Tracer: tracer, ComputationCostLimit: params.OpcodeComputationCostLimitInfinite})
+	chain, err := blockchain.NewBlockChain(db, nil, config, engine, vm.Config{Debug: true, Tracer: tracer, ComputationCostLimit: params.OpcodeComputationCostLimitInfinite})
 	if err != nil {
 		return err
 	}
@@ -316,6 +313,11 @@ func makeBlockFromTxs(bc *blockchain.BlockChain, db database.DBManager, txs type
 		types.IsPragueInExecutionSpecTest = true
 	}
 	blockchain.GasLimitInExecutionSpecTest = header.GasLimit
+
+	engine := bc.Engine().(*eestEngine)
+	engine.preInitialize = func(c consensus.ChainReader, h *types.Header, s *state.StateDB) {
+		h.BaseFee = header.BaseFee
+	}
 
 	// var maxFeePerGas *big.Int
 	blocks, _ := blockchain.GenerateChain(bc.Config(), preBlock, bc.Engine(), db, 1, func(i int, b *blockchain.BlockGen) {
@@ -525,4 +527,27 @@ func (bb *btBlock) decode() (types.Transactions, TestHeader, error) {
 	}
 
 	return txs, header, nil
+}
+
+type eestEngine struct {
+	*gxhash.Gxhash
+	preInitialize func(consensus.ChainReader, *types.Header, *state.StateDB)
+}
+
+var _ consensus.Engine = &eestEngine{}
+
+func (e *eestEngine) Initialize(chain consensus.ChainReader, header *types.Header, state *state.StateDB) {
+	if e.preInitialize != nil {
+		e.preInitialize(chain, header, state)
+	}
+	if chain.Config().IsPragueForkEnabled(header.Number) {
+		context := blockchain.NewEVMBlockContext(header, chain, nil)
+		vmenv := vm.NewEVM(context, vm.TxContext{}, state, chain.Config(), &vm.Config{})
+		blockchain.ProcessParentBlockHash(header, vmenv, state, chain.Config().Rules(header.Number))
+	}
+}
+
+func (e *eestEngine) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
+	// change reward process
+	return e.Gxhash.Finalize(chain, header, state, txs, receipts)
 }
