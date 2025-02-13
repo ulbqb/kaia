@@ -45,6 +45,7 @@ import (
 	"github.com/kaiachain/kaia/rlp"
 	"github.com/kaiachain/kaia/storage/database"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -2835,4 +2836,34 @@ func benchmarkPoolBatchInsert(b *testing.B, size int) {
 	for _, batch := range batches {
 		pool.AddRemotes(batch)
 	}
+}
+
+func TestGaslessTransaction(t *testing.T) {
+	t.Parallel()
+
+	pool, _ := setupTxPool()
+	defer pool.Stop()
+
+	proposer, err := crypto.HexToECDSA("bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1")
+	require.NoError(t, err)
+	user, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	gaslessTx, _ := types.SignTx(types.NewTransaction(0, common.HexToAddress("0x000000000000000000000000000000000000aaaa"), big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), user)
+	userAddr, _ := deriveSender(gaslessTx)
+
+	lendTx, _ := types.SignTx(types.NewTransaction(0, userAddr, big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), proposer)
+	proposerAddr, _ := deriveSender(lendTx)
+
+	testAddBalance(pool, proposerAddr, big.NewInt(1000000000))
+
+	err = pool.AddLocal(gaslessTx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(pool.queue))
+	require.Equal(t, 0, len(pool.pending))
+
+	err = pool.AddLocal(lendTx)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pool.queue))
+	require.Equal(t, 2, len(pool.pending))
 }
