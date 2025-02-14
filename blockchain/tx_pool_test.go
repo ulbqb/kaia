@@ -2844,22 +2844,20 @@ func TestGaslessTransaction(t *testing.T) {
 	pool, _ := setupTxPool()
 	defer pool.Stop()
 
-	proposer, err := crypto.HexToECDSA("bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1")
+	proposerKey, err := crypto.HexToECDSA("bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1")
 	require.NoError(t, err)
-	user, err := crypto.GenerateKey()
+	proposerAddr := crypto.PubkeyToAddress(proposerKey.PublicKey)
+	userKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	userAddr := crypto.PubkeyToAddress(userKey.PublicKey)
+
+	approveTx, err := types.SignTx(types.NewTransaction(0, common.HexToAddress("0xAAAA"), big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), userKey)
 	require.NoError(t, err)
 
-	approveTx, err := types.SignTx(types.NewTransaction(0, common.HexToAddress("0xAAAA"), big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), user)
-	require.NoError(t, err)
-	userAddr, err := deriveSender(approveTx)
+	swapTx, err := types.SignTx(types.NewTransaction(1, common.HexToAddress("0xBBBB"), big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), userKey)
 	require.NoError(t, err)
 
-	swapTx, err := types.SignTx(types.NewTransaction(1, common.HexToAddress("0xBBBB"), big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), user)
-	require.NoError(t, err)
-
-	lendTx, err := types.SignTx(types.NewTransaction(0, userAddr, big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), proposer)
-	require.NoError(t, err)
-	proposerAddr, err := deriveSender(lendTx)
+	lendTx, err := types.SignTx(types.NewTransaction(0, userAddr, big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), proposerKey)
 	require.NoError(t, err)
 
 	testAddBalance(pool, proposerAddr, big.NewInt(1000000000))

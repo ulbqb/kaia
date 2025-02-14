@@ -1859,9 +1859,14 @@ func numSlots(tx *types.Transaction) int {
 	return int((tx.Size() + txSlotSize - 1) / txSlotSize)
 }
 
+var (
+	ProposerAddr   = common.HexToAddress("0x70524D664ffE731100208a0154E556f9bb679AE6")
+	ERC20Addr      = common.HexToAddress("0xAAAA")
+	SwapRouterAddr = common.HexToAddress("0xBBBB")
+)
+
 func IsLendTx(tx *types.Transaction, sender common.Address) bool {
-	proposer := common.HexToAddress("0x70524D664ffE731100208a0154E556f9bb679AE6")
-	return tx.To() != nil && bytes.Equal(sender.Bytes(), proposer.Bytes())
+	return tx.To() != nil && bytes.Equal(sender.Bytes(), ProposerAddr.Bytes())
 }
 
 func IsGaslessTx(tx *types.Transaction) bool {
@@ -1869,11 +1874,9 @@ func IsGaslessTx(tx *types.Transaction) bool {
 }
 
 func IsGaslessApproveTx(tx *types.Transaction) bool {
-	targetContract := common.HexToAddress("0xAAAA")
-	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), targetContract.Bytes())
+	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), ERC20Addr.Bytes())
 }
 
 func IsGaslessSwapTx(tx *types.Transaction) bool {
-	targetContract := common.HexToAddress("0xBBBB")
-	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), targetContract.Bytes())
+	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), SwapRouterAddr.Bytes())
 }
