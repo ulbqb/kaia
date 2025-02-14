@@ -1865,15 +1865,15 @@ func IsLendTx(tx *types.Transaction, sender common.Address) bool {
 }
 
 func IsGaslessTx(tx *types.Transaction) bool {
-	return isGaslessApproveTx(tx) || isGaslessSwapTx(tx)
+	return IsGaslessApproveTx(tx) || IsGaslessSwapTx(tx)
 }
 
-func isGaslessApproveTx(tx *types.Transaction) bool {
+func IsGaslessApproveTx(tx *types.Transaction) bool {
 	targetContract := common.HexToAddress("0xAAAA")
 	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), targetContract.Bytes())
 }
 
-func isGaslessSwapTx(tx *types.Transaction) bool {
+func IsGaslessSwapTx(tx *types.Transaction) bool {
 	targetContract := common.HexToAddress("0xBBBB")
 	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), targetContract.Bytes())
 }

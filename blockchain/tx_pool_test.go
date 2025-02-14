@@ -2849,21 +2849,33 @@ func TestGaslessTransaction(t *testing.T) {
 	user, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	gaslessTx, _ := types.SignTx(types.NewTransaction(0, common.HexToAddress("0x000000000000000000000000000000000000aaaa"), big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), user)
-	userAddr, _ := deriveSender(gaslessTx)
+	approveTx, err := types.SignTx(types.NewTransaction(0, common.HexToAddress("0xAAAA"), big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), user)
+	require.NoError(t, err)
+	userAddr, err := deriveSender(approveTx)
+	require.NoError(t, err)
 
-	lendTx, _ := types.SignTx(types.NewTransaction(0, userAddr, big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), proposer)
-	proposerAddr, _ := deriveSender(lendTx)
+	swapTx, err := types.SignTx(types.NewTransaction(1, common.HexToAddress("0xBBBB"), big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), user)
+	require.NoError(t, err)
+
+	lendTx, err := types.SignTx(types.NewTransaction(0, userAddr, big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), proposer)
+	require.NoError(t, err)
+	proposerAddr, err := deriveSender(lendTx)
+	require.NoError(t, err)
 
 	testAddBalance(pool, proposerAddr, big.NewInt(1000000000))
 
-	err = pool.AddLocal(gaslessTx)
+	err = pool.AddLocal(approveTx)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(pool.queue))
-	require.Equal(t, 0, len(pool.pending))
+	require.Equal(t, 0, len(pool.queue))
+	require.Equal(t, 1, pool.pending[userAddr].Len())
+
+	err = pool.AddLocal(swapTx)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pool.queue))
+	require.Equal(t, 2, pool.pending[userAddr].Len())
 
 	err = pool.AddLocal(lendTx)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pool.queue))
-	require.Equal(t, 2, len(pool.pending))
+	require.Equal(t, 1, pool.pending[proposerAddr].Len())
 }
