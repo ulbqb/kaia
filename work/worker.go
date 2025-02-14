@@ -546,6 +546,52 @@ func (self *worker) commitNewWork() {
 			nextBaseFee = misc.NextMagmaBlockBaseFee(parent.Header(), pset.ToKip71Config())
 			pending = types.FilterTransactionWithBaseFee(pending, nextBaseFee)
 		}
+
+		// gasless txs process only if lend tx and gasless tx exist.
+		// here checks only if there is lend tx for convenience.
+
+		// gasslessSet[0] is lend tx, 1 is approve tx, 2 is swap tx
+		gaslessSet := map[common.Address][3]*struct {
+			addr common.Address
+			txi  int
+		}{}
+
+		for addr, txs := range pending {
+			for txi, tx := range txs {
+				position := &struct {
+					addr common.Address
+					txi  int
+				}{
+					addr, txi,
+				}
+				if blockchain.IsLendTx(tx, addr) {
+					set := gaslessSet[*tx.To()]
+					set[0] = position
+					gaslessSet[*tx.To()] = set
+				}
+				if blockchain.IsGaslessApproveTx(tx) {
+					set := gaslessSet[addr]
+					set[1] = position
+					gaslessSet[addr] = set
+				}
+				if blockchain.IsGaslessSwapTx(tx) {
+					set := gaslessSet[addr]
+					set[2] = position
+					gaslessSet[addr] = set
+				}
+			}
+		}
+
+		// remove txs if gasless set ([lend, approve, swap] or [lend, swap]) isn't available
+		for _, set := range gaslessSet {
+			if set[0] == nil || set[2] == nil {
+				for _, s := range set {
+					if s != nil {
+						pending[s.addr] = append(pending[s.addr][:s.txi], pending[s.addr][:s.txi]...)
+					}
+				}
+			}
+		}
 	}
 
 	header := &types.Header{

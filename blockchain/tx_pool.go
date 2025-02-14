@@ -830,7 +830,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction) error {
 			return ErrInsufficientFundsFrom
 		}
 	} else {
-		if !isGaslessTx(tx) {
+		if !IsGaslessTx(tx) {
 			// balance check for non-fee-delegated tx
 			if senderBalance.Cmp(tx.Cost()) < 0 {
 				logger.Trace("[tx_pool] insufficient funds for cost(gas * price + value)", "from", from, "balance", senderBalance, "cost", tx.Cost())
@@ -1296,7 +1296,7 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 		from, _ := types.Sender(pool.signer, tx) // already validated
 		accounts := []common.Address{from}
 		// if tx is lend tx
-		if isLendTx(tx, from) {
+		if IsLendTx(tx, from) {
 			accounts = append(accounts, *tx.To())
 		}
 		pool.promoteExecutables(accounts)
@@ -1450,7 +1450,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		// Drop all transactions that are too costly (low balance)
 		drops, _ := list.Filter(addr, pool)
 		for _, tx := range drops {
-			if isGaslessTx(tx) {
+			if IsGaslessTx(tx) {
 				list.Add(tx, pool.config.PriceBump, pool.rules.IsMagma)
 				continue
 			}
@@ -1470,12 +1470,12 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		}
 		for _, tx := range readyTxs {
 			// skip if to is target contract and addr will be lent tokens.
-			if _, ok := lentAccounts[addr]; isGaslessTx(tx) && !ok {
+			if _, ok := lentAccounts[addr]; IsGaslessTx(tx) && !ok {
 				list.Add(tx, pool.config.PriceBump, pool.rules.IsMagma)
 				continue
 			}
 			// add to to lent accounts if tx is lend tx
-			if isLendTx(tx, addr) {
+			if IsLendTx(tx, addr) {
 				lentAccounts[*tx.To()] = true
 			}
 			hash := tx.Hash()
@@ -1648,7 +1648,7 @@ func (pool *TxPool) demoteUnexecutables() {
 
 		// Drop all transactions that are unexecutable, and queue any invalids back for later
 		for _, tx := range drops {
-			if isGaslessTx(tx) {
+			if IsGaslessTx(tx) {
 				list.Add(tx, pool.config.PriceBump, pool.rules.IsMagma)
 				continue
 			}
@@ -1874,12 +1874,21 @@ func numSlots(tx *types.Transaction) int {
 	return int((tx.Size() + txSlotSize - 1) / txSlotSize)
 }
 
-func isLendTx(tx *types.Transaction, sender common.Address) bool {
+func IsLendTx(tx *types.Transaction, sender common.Address) bool {
 	proposer := common.HexToAddress("0x70524D664ffE731100208a0154E556f9bb679AE6")
 	return tx.To() != nil && bytes.Equal(sender.Bytes(), proposer.Bytes())
 }
 
-func isGaslessTx(tx *types.Transaction) bool {
+func IsGaslessTx(tx *types.Transaction) bool {
+	return IsGaslessApproveTx(tx) || IsGaslessSwapTx(tx)
+}
+
+func IsGaslessApproveTx(tx *types.Transaction) bool {
 	targetContract := common.HexToAddress("0xAAAA")
+	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), targetContract.Bytes())
+}
+
+func IsGaslessSwapTx(tx *types.Transaction) bool {
+	targetContract := common.HexToAddress("0xBBBB")
 	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), targetContract.Bytes())
 }
