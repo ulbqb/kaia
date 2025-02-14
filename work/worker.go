@@ -893,6 +893,9 @@ func filterGaslessTransaction(pending map[common.Address]types.Transactions) map
 						txs = append(txs, tx)
 					}
 					pending[s.addr] = txs
+					if pending[s.addr].Len() == 0 {
+						delete(pending, s.addr)
+					}
 				}
 			}
 		}

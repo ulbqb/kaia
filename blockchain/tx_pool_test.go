@@ -2841,7 +2841,12 @@ func benchmarkPoolBatchInsert(b *testing.B, size int) {
 func TestGaslessTransaction(t *testing.T) {
 	t.Parallel()
 
-	pool, _ := setupTxPool()
+	conf := params.TestChainConfig
+	conf.IstanbulCompatibleBlock = big.NewInt(0)
+	conf.LondonCompatibleBlock = big.NewInt(0)
+	conf.EthTxTypeCompatibleBlock = big.NewInt(0)
+	conf.MagmaCompatibleBlock = big.NewInt(0)
+	pool, _ := setupTxPoolWithConfig(params.TestChainConfig)
 	defer pool.Stop()
 
 	proposerKey, err := crypto.HexToECDSA("bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1")
@@ -2876,5 +2881,43 @@ func TestGaslessTransaction(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pool.queue))
 	require.Equal(t, 2, pool.pending[userAddr].Len())
+	require.Equal(t, 1, pool.pending[proposerAddr].Len())
+}
+
+func TestGaslessTransaction2(t *testing.T) {
+	t.Parallel()
+
+	conf := params.TestChainConfig
+	conf.IstanbulCompatibleBlock = big.NewInt(0)
+	conf.LondonCompatibleBlock = big.NewInt(0)
+	conf.EthTxTypeCompatibleBlock = big.NewInt(0)
+	conf.MagmaCompatibleBlock = big.NewInt(0)
+	pool, _ := setupTxPoolWithConfig(params.TestChainConfig)
+	defer pool.Stop()
+
+	proposerKey, err := crypto.HexToECDSA("bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1")
+	require.NoError(t, err)
+	proposerAddr := crypto.PubkeyToAddress(proposerKey.PublicKey)
+	userKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	userAddr := crypto.PubkeyToAddress(userKey.PublicKey)
+
+	swapTx, err := types.SignTx(types.NewTransaction(1, common.HexToAddress("0xBBBB"), big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), userKey)
+	require.NoError(t, err)
+
+	lendTx, err := types.SignTx(types.NewTransaction(0, userAddr, big.NewInt(100), 100000, big.NewInt(1), nil), types.LatestSignerForChainID(params.TestChainConfig.ChainID), proposerKey)
+	require.NoError(t, err)
+
+	testAddBalance(pool, proposerAddr, big.NewInt(1000000000))
+
+	err = pool.AddLocal(swapTx)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pool.queue))
+	require.Equal(t, 1, pool.pending[userAddr].Len())
+
+	err = pool.AddLocal(lendTx)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(pool.queue))
+	require.Equal(t, 1, pool.pending[userAddr].Len())
 	require.Equal(t, 1, pool.pending[proposerAddr].Len())
 }
