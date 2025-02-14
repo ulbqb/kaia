@@ -1294,12 +1294,7 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	// If we added a new transaction, run promotion checks and return
 	if !replace {
 		from, _ := types.Sender(pool.signer, tx) // already validated
-		accounts := []common.Address{from}
-		// if tx is lend tx
-		if IsLendTx(tx, from) {
-			accounts = append(accounts, *tx.To())
-		}
-		pool.promoteExecutables(accounts)
+		pool.promoteExecutables([]common.Address{from})
 	}
 	return nil
 }
@@ -1424,7 +1419,6 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 	defer pool.txMu.Unlock()
 	// Track the promoted transactions to broadcast them at once
 	var promoted []*types.Transaction
-	lentAccounts := map[common.Address]interface{}{}
 
 	// Gather all the accounts potentially needing updates
 	if accounts == nil {
@@ -1469,15 +1463,6 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			readyTxs = list.Ready(pool.getPendingNonce(addr))
 		}
 		for _, tx := range readyTxs {
-			// skip if to is target contract and addr will be lent tokens.
-			if _, ok := lentAccounts[addr]; IsGaslessTx(tx) && !ok {
-				list.Add(tx, pool.config.PriceBump, pool.rules.IsMagma)
-				continue
-			}
-			// add to to lent accounts if tx is lend tx
-			if IsLendTx(tx, addr) {
-				lentAccounts[*tx.To()] = true
-			}
 			hash := tx.Hash()
 			if pool.promoteTx(addr, hash, tx) {
 				logger.Trace("Promoting queued transaction", "hash", hash)
@@ -1880,15 +1865,15 @@ func IsLendTx(tx *types.Transaction, sender common.Address) bool {
 }
 
 func IsGaslessTx(tx *types.Transaction) bool {
-	return IsGaslessApproveTx(tx) || IsGaslessSwapTx(tx)
+	return isGaslessApproveTx(tx) || isGaslessSwapTx(tx)
 }
 
-func IsGaslessApproveTx(tx *types.Transaction) bool {
+func isGaslessApproveTx(tx *types.Transaction) bool {
 	targetContract := common.HexToAddress("0xAAAA")
 	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), targetContract.Bytes())
 }
 
-func IsGaslessSwapTx(tx *types.Transaction) bool {
+func isGaslessSwapTx(tx *types.Transaction) bool {
 	targetContract := common.HexToAddress("0xBBBB")
 	return tx.To() != nil && bytes.Equal(tx.To().Bytes(), targetContract.Bytes())
 }
