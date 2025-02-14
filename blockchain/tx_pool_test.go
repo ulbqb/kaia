@@ -2877,5 +2877,6 @@ func TestGaslessTransaction(t *testing.T) {
 	err = pool.AddLocal(lendTx)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(pool.queue))
+	require.Equal(t, 2, pool.pending[userAddr].Len())
 	require.Equal(t, 1, pool.pending[proposerAddr].Len())
 }
