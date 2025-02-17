@@ -26,8 +26,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
+	"github.com/kaiachain/kaia/blockchain/types"
 	"github.com/kaiachain/kaia/blockchain/types/accountkey"
+	"github.com/kaiachain/kaia/common"
 	"github.com/kaiachain/kaia/common/hexutil"
 	"github.com/kaiachain/kaia/networks/rpc"
 	"github.com/kaiachain/kaia/rlp"
@@ -160,6 +163,43 @@ func (s *PublicKaiaAPI) DecodeAccountKey(encodedAccKey hexutil.Bytes) (*accountk
 		return nil, err
 	}
 	return dec, nil
+}
+
+func (s *PublicKaiaAPI) SendBundledRawTransaction(ctx context.Context, inputs []hexutil.Bytes) ([]common.Hash, []error) {
+	hash := []common.Hash{}
+	errs := []error{}
+
+	if len(inputs) == 0 {
+		hash = append(hash, common.Hash{})
+		errs = append(errs, fmt.Errorf("Empty input"))
+		return hash, errs
+	}
+
+	for _, input := range inputs {
+		if len(input) == 0 {
+			hash = append(hash, common.Hash{})
+			errs = append(errs, fmt.Errorf("Empty input"))
+			break
+		}
+		if 0 < input[0] && input[0] < 0x7f {
+			input = append([]byte{byte(types.EthereumTxTypeEnvelope)}, input...)
+		}
+		tx := new(types.Transaction)
+		if err := rlp.DecodeBytes(input, tx); err != nil {
+			hash = append(hash, common.Hash{})
+			errs = append(errs, err)
+			break
+		}
+		if err := s.b.SendTx(ctx, tx); err != nil {
+			hash = append(hash, common.Hash{})
+			errs = append(errs, err)
+			break
+		}
+		hash = append(hash, tx.Hash())
+		errs = append(errs, nil)
+	}
+
+	return hash, errs
 }
 
 // checkAccountKeyZeroValues returns errors if the input account key contains zero values of threshold or weight.
