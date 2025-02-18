@@ -165,14 +165,13 @@ func (s *PublicKaiaAPI) DecodeAccountKey(encodedAccKey hexutil.Bytes) (*accountk
 	return dec, nil
 }
 
-func (s *PublicKaiaAPI) SendBundledRawTransaction(ctx context.Context, inputs []hexutil.Bytes) ([]common.Hash, []error) {
+func (s *PublicKaiaAPI) SendBundledRawTransaction(ctx context.Context, inputs []hexutil.Bytes) ([]common.Hash, error) {
 	hash := []common.Hash{}
 	errs := []error{}
 
 	if len(inputs) == 0 {
 		hash = append(hash, common.Hash{})
-		errs = append(errs, fmt.Errorf("Empty input"))
-		return hash, errs
+		return hash, fmt.Errorf("Empty input")
 	}
 
 	for _, input := range inputs {
@@ -196,10 +195,9 @@ func (s *PublicKaiaAPI) SendBundledRawTransaction(ctx context.Context, inputs []
 			break
 		}
 		hash = append(hash, tx.Hash())
-		errs = append(errs, nil)
 	}
 
-	return hash, errs
+	return hash, errors.Join(errs...)
 }
 
 // checkAccountKeyZeroValues returns errors if the input account key contains zero values of threshold or weight.
