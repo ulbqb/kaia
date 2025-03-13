@@ -39,6 +39,7 @@ type GaslessModule struct {
 	swapRouters   map[common.Address]bool
 	allowedTokens map[common.Address]bool
 	signer        types.Signer
+	disable       bool
 }
 
 func NewGaslessModule() *GaslessModule {

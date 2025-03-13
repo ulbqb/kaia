@@ -27,13 +27,28 @@ type ChainConfig struct {
 }
 
 var SwapRoutersFlag = &cli.StringSliceFlag{
-	Name:    "swap-routers",
+	Name:    "gasless.swap-routers",
 	Usage:   "SwapRouters for gasless module",
 	Aliases: []string{"genesis.module.gasless.swap-routers"},
 }
 
 var AllowedTokensFlag = &cli.StringSliceFlag{
-	Name:    "allowed-tokens",
+	Name:    "gasless.allowed-tokens",
 	Usage:   "AllowedTokens for gasless module",
 	Aliases: []string{"genesis.module.gasless.allowed-tokens"},
+}
+
+func GenGenesis(ctx *cli.Context) *ChainConfig {
+	swapRouters := []common.Address{}
+	for _, addr := range ctx.StringSlice(SwapRoutersFlag.Name) {
+		swapRouters = append(swapRouters, common.HexToAddress(addr))
+	}
+	allowedTokens := []common.Address{}
+	for _, addr := range ctx.StringSlice(AllowedTokensFlag.Name) {
+		allowedTokens = append(allowedTokens, common.HexToAddress(addr))
+	}
+	return &ChainConfig{
+		SwapRouters:   swapRouters,
+		AllowedTokens: allowedTokens,
+	}
 }
