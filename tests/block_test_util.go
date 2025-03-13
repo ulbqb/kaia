@@ -124,29 +124,11 @@ var _ consensus.Engine = &eestEngine{}
 
 // This is called inside blockchain.ApplyTransaction to manipulate the evm configuration and recreate the eth.
 func (e *eestEngine) BeforeApplyMessage(evm *vm.EVM, msg *types.Transaction) {
-	// Change GasLimit to the one in the eth header
-	evm.Context.GasLimit = e.gasLimit
-
-	if evm.ChainConfig().Rules(evm.Context.BlockNumber).IsCancun {
-		// EIP-1052 must be activated for backward compatibility on Kaia. But EIP-2929 is activated instead of it on Ethereum
-		vm.ChangeGasCostForTest(&evm.Config.JumpTable, vm.EXTCODEHASH, params.WarmStorageReadCostEIP2929)
-	}
-
-	// When istanbul is enabled, instrinsic gas is different from eth, so enable IsPrague to make them equal
 	r := evm.ChainConfig().Rules(evm.Context.BlockNumber)
-	if evm.ChainConfig().Rules(evm.Context.BlockNumber).IsIstanbul {
-		r.IsPrague = true
-	}
-	updatedIntrinsicGas, _ := types.IntrinsicGas(msg.Data(), msg.AccessList(), msg.AuthList(), msg.To() == nil, r)
-	sender := msg.ValidatedSender()
-	sigCopy := msg.RawSignatureValues()
-
-	// Replace msg intrinsic gas with eth intrinsic gas
-	*msg = *types.NewMessage(sender, msg.To(), msg.Nonce(), msg.GetTxInternalData().GetAmount(), msg.Gas(), msg.GasPrice(), msg.GasFeeCap(), msg.GasTipCap(), msg.Data(), true, updatedIntrinsicGas, msg.AccessList(), r.ChainID, msg.AuthList())
-	msg.SetSignature(sigCopy)
-
-	// Gas prices are calculated in eth
-	evm.GasPrice, _ = calculateEthGasPrice(evm.ChainConfig().Rules(evm.Context.BlockNumber), msg.GasPrice(), e.baseFee, msg.GasFeeCap(), msg.GasTipCap())
+	useEthBlockGasLimit(evm, e.gasLimit)
+	useEthOpCodeGas(evm, r)
+	useEthGasPrice(evm, msg, e.baseFee)
+	useEthIntrinsicGas(msg, r)
 }
 
 func (e *eestEngine) Initialize(chain consensus.ChainReader, header *types.Header, state *state.StateDB) {
@@ -158,21 +140,15 @@ func (e *eestEngine) Initialize(chain consensus.ChainReader, header *types.Heade
 }
 
 func (e *eestEngine) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
-	ethReward := common.Big0
 	for _, receipt := range receipts {
 		for _, tx := range txs {
 			if tx.Hash() != receipt.TxHash {
 				continue
 			}
-
-			ethGasPrice, _ := calculateEthGasPrice(chain.Config().Rules(header.Number), tx.GasPrice(), e.baseFee, tx.GasFeeCap(), tx.GasTipCap())
-			ethReward = new(big.Int).Add(ethReward, calculateEthMiningReward(ethGasPrice, tx.GasFeeCap(), tx.GasTipCap(), e.baseFee, receipt.GasUsed, chain.Config().Rules(header.Number)))
+			useEthMiningReward(state, header.Rewardbase, tx, e.baseFee, receipt.GasUsed, chain.Config().Rules(header.Number))
 		}
 	}
-
-	state.AddBalance(header.Rewardbase, ethReward)
 	header.Root = state.IntermediateRoot(true)
-
 	return types.NewBlock(header, txs, receipts), nil
 }
 

@@ -25,7 +25,6 @@ package tests
 import (
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -261,7 +260,7 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, isTest
 	st = MakePreState(memDBManager, t.json.Pre, isTestExecutionSpecState, rules)
 
 	post := t.json.Post[subtest.Fork][subtest.Index]
-	msg, err := t.json.Tx.toMessage(post, rules, isTestExecutionSpecState)
+	msg, err := t.json.Tx.toMessage(post, rules)
 	if err != nil {
 		return st, common.Hash{}, err
 	}
@@ -283,21 +282,15 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, isTest
 	}
 
 	txContext := blockchain.NewEVMTxContext(msg, block.Header(), config)
-	if isTestExecutionSpecState {
-		txContext.GasPrice, err = useEthGasPrice(rules, &t.json)
-		if err != nil {
-			return st, common.Hash{}, err
-		}
-	}
 	blockContext := blockchain.NewEVMBlockContext(block.Header(), nil, &t.json.Env.Coinbase)
 	blockContext.GetHash = vmTestBlockHash
-	if isTestExecutionSpecState {
-		blockContext.GasLimit = t.json.Env.GasLimit
-	}
 	evm := vm.NewEVM(blockContext, txContext, st, config, &vmconfig)
 
 	if isTestExecutionSpecState {
-		useEthOpCodeGas(rules, evm)
+		useEthBlockGasLimit(evm, t.json.Env.GasLimit)
+		useEthOpCodeGas(evm, rules)
+		useEthGasPrice(evm, msg, t.json.Env.BaseFee)
+		useEthIntrinsicGas(msg, rules)
 	}
 
 	snapshot := st.Snapshot()
@@ -307,7 +300,7 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, isTest
 	}
 
 	if err == nil && isTestExecutionSpecState {
-		useEthMiningReward(st, evm.Context.Coinbase, &t.json.Tx, t.json.Env.BaseFee, result.UsedGas, txContext.GasPrice, rules)
+		useEthMiningReward(st, evm.Context.Coinbase, msg, t.json.Env.BaseFee, result.UsedGas, rules)
 	}
 
 	root, _ = st.Commit(true)
@@ -373,7 +366,7 @@ func (t *StateTest) genesis(config *params.ChainConfig) *blockchain.Genesis {
 	}
 }
 
-func (tx *stTransaction) toMessage(ps stPostState, r params.Rules, isTestExecutionSpecState bool) (blockchain.Message, error) {
+func (tx *stTransaction) toMessage(ps stPostState, r params.Rules) (*types.Transaction, error) {
 	// Derive sender from private key if present.
 	var from common.Address
 	if len(tx.PrivateKey) > 0 {
@@ -445,13 +438,7 @@ func (tx *stTransaction) toMessage(ps stPostState, r params.Rules, isTestExecuti
 		}
 	}
 
-	var intrinsicGas uint64
-	if isTestExecutionSpecState {
-		intrinsicGas, err = useEthIntrinsicGas(data, accessList, authorizationList, to == nil, r)
-	} else {
-		intrinsicGas, err = types.IntrinsicGas(data, nil, nil, to == nil, r)
-	}
-
+	intrinsicGas, err := types.IntrinsicGas(data, nil, nil, to == nil, r)
 	if err != nil {
 		return nil, err
 	}
@@ -465,110 +452,4 @@ func rlpHash(x interface{}) (h common.Hash) {
 	rlp.Encode(hw, x)
 	hw.Sum(h[:0])
 	return h
-}
-
-func useEthGasPrice(r params.Rules, json *stJSON) (*big.Int, error) {
-	if json.Tx.MaxFeePerGas == nil {
-		json.Tx.MaxFeePerGas = json.Tx.GasPrice
-	}
-	if json.Tx.MaxFeePerGas == nil {
-		json.Tx.MaxFeePerGas = new(big.Int)
-	}
-	if json.Tx.MaxPriorityFeePerGas == nil {
-		json.Tx.MaxPriorityFeePerGas = json.Tx.MaxFeePerGas
-	}
-	return calculateEthGasPrice(r, json.Tx.GasPrice, json.Env.BaseFee, json.Tx.MaxFeePerGas, json.Tx.MaxPriorityFeePerGas)
-}
-
-func calculateEthGasPrice(r params.Rules, envGasPrice, envBaseFee, envMaxFeePerGas, envMaxPriorityFeePerGas *big.Int) (*big.Int, error) {
-	// https://github.com/ethereum/go-ethereum/blob/v1.14.11/tests/state_test_util.go#L241-L249
-	var baseFee *big.Int
-	if r.IsLondon {
-		baseFee = envBaseFee
-		if baseFee == nil {
-			// Retesteth uses `0x10` for genesis baseFee. Therefore, it defaults to
-			// parent - 2 : 0xa as the basefee for 'this' context.
-			baseFee = big.NewInt(0x0a)
-		}
-	}
-
-	// https://github.com/ethereum/go-ethereum/blob/v1.14.11/tests/state_test_util.go#L402-L416
-	gasPrice := envGasPrice
-	if baseFee != nil {
-		gasPrice = math.BigMin(new(big.Int).Add(envMaxPriorityFeePerGas, baseFee), envMaxFeePerGas)
-	}
-
-	if gasPrice == nil {
-		return nil, errors.New("no gas price provided")
-	}
-
-	return gasPrice, nil
-}
-
-func useEthOpCodeGas(r params.Rules, evm *vm.EVM) {
-	if r.IsCancun {
-		// EIP-1052 must be activated for backward compatibility on Kaia. But EIP-2929 is activated instead of it on Ethereum
-		vm.ChangeGasCostForTest(&evm.Config.JumpTable, vm.EXTCODEHASH, params.WarmStorageReadCostEIP2929)
-	}
-}
-
-func useEthIntrinsicGas(data []byte, accessList types.AccessList, authorizationList []types.SetCodeAuthorization, contractCreation bool, r params.Rules) (uint64, error) {
-	if r.IsIstanbul {
-		r.IsPrague = true
-	}
-	return types.IntrinsicGas(data, accessList, authorizationList, contractCreation, r)
-}
-
-func useEthMiningReward(statedb *state.StateDB, coinbase common.Address, tx *stTransaction, envBaseFee *big.Int, usedGas uint64, gasPrice *big.Int, rules params.Rules) {
-	fee := calculateEthMiningReward(gasPrice, tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, envBaseFee, usedGas, rules)
-	statedb.AddBalance(coinbase, fee)
-}
-
-func calculateEthMiningReward(gasPrice, maxFeePerGas, maxPriorityFeePerGas, envBaseFee *big.Int, usedGas uint64, rules params.Rules) *big.Int {
-	effectiveTip := new(big.Int).Set(gasPrice)
-
-	// https://github.com/ethereum/go-ethereum/blob/v1.14.11/tests/state_test_util.go#L241-L249
-	// https://github.com/ethereum/go-ethereum/blob/v1.14.11/core/state_transition.go#L462-L465
-	if rules.IsLondon {
-		baseFee := new(big.Int).Set(envBaseFee)
-		if baseFee == nil {
-			// Retesteth uses `0x10` for genesis baseFee. Therefore, it defaults to
-			// parent - 2 : 0xa as the basefee for 'this' context.
-			baseFee = big.NewInt(0x0a)
-		}
-		effectiveTip = math.BigMin(maxPriorityFeePerGas, new(big.Int).Sub(maxFeePerGas, baseFee))
-	}
-
-	fee := new(big.Int).SetUint64(usedGas)
-	return fee.Mul(fee, effectiveTip)
-}
-
-func useEthGenesisState(statedb *state.StateDB) (common.Hash, error) {
-	return useEthStateRootWithOption(statedb, false)
-}
-
-func useEthState(statedb *state.StateDB) (common.Hash, error) {
-	return useEthStateRootWithOption(statedb, true)
-}
-
-func useEthStateRootWithOption(statedb *state.StateDB, deleteEmptyObjects bool) (common.Hash, error) {
-	memDb := database.NewMemoryDBManager()
-	db := state.NewDatabase(memDb)
-	newState, _ := state.New(common.Hash{}, db, nil, nil)
-
-	for addr, acc := range statedb.RawDump().Accounts {
-		b, ok := new(big.Int).SetString(acc.Balance, 10)
-		if !ok {
-			return common.Hash{}, errors.New("balance is not decimal")
-		}
-		newState.SetLegacyAccountForTest(
-			common.HexToAddress(addr),
-			acc.Nonce,
-			b,
-			common.HexToHash(acc.Root),
-			common.HexToHash(acc.CodeHash).Bytes(),
-		)
-	}
-
-	return newState.IntermediateRoot(deleteEmptyObjects), nil
 }
