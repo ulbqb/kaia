@@ -331,11 +331,19 @@ func MakePreState(db database.DBManager, accounts blockchain.GenesisAlloc, isTes
 	statedb, _ := state.New(common.Hash{}, sdb, nil, nil)
 	for addr, a := range accounts {
 		if isTestExecutionSpecState {
-			if _, ok := types.ParseDelegation(a.Code); ok && rules.IsPrague {
+			_, ok := types.ParseDelegation(a.Code)
+			isEOAWithCode := ok && rules.IsPrague
+			isEOAWithoutCode := len(a.Code) == 0 && len(a.Storage) != 0 && rules.IsPrague
+			isSCAWithCode := !isEOAWithCode && len(a.Code) != 0
+			switch {
+			case isEOAWithCode:
+				// EOA with code. Usually SetCodeTx creates it. Unit tests may create it here in the genesis.
 				statedb.SetCodeToEOA(addr, a.Code, rules)
-			} else if len(a.Code) == 0 && len(a.Storage) != 0 && rules.IsPrague {
+			case isEOAWithoutCode:
+				// Represents an EOA that had code then nullified with another SetCodeTx. Unit tests may create it here in the genesis.
 				statedb.CreateEOA(addr, false, accountkey.NewAccountKeyLegacy())
-			} else if len(a.Code) != 0 {
+			case isSCAWithCode:
+				// Regular genesis smart contract account.
 				statedb.CreateSmartContractAccount(addr, params.CodeFormatEVM, rules)
 				statedb.SetCode(addr, a.Code)
 			}
