@@ -50,12 +50,11 @@ func (g *GaslessModule) Init(opts *InitOpts) error {
 		return ErrInitUnexpectedNil
 	}
 	g.InitOpts = *opts
-
-	g.swapRouters = map[common.Address]bool{
-		common.HexToAddress("0x1234"): true,
+	for _, addr := range opts.ChainConfig.Gasless.SwapRouters {
+		g.swapRouters[addr] = true
 	}
-	g.allowedTokens = map[common.Address]bool{
-		common.HexToAddress("0xabcd"): true,
+	for _, addr := range opts.ChainConfig.Gasless.AllowedTokens {
+		g.allowedTokens[addr] = true
 	}
 	g.signer = types.LatestSignerForChainID(g.ChainConfig.ChainID)
 	return nil

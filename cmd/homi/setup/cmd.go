@@ -794,6 +794,7 @@ func Gen(ctx *cli.Context) error {
 	genesisJson.Config.RandaoCompatibleBlock = big.NewInt(ctx.Int64(randaoCompatibleBlockNumberFlag.Name))
 	genesisJson.Config.PragueCompatibleBlock = big.NewInt(ctx.Int64(pragueCompatibleBlockNumberFlag.Name))
 
+	genesisJson.Config.Gasless = &gasless.ChainConfig{}
 	genesisJson.Config.Gasless.SwapRouters = ctx.StringSlice(gasless.SwapRoutersFlag.Name)
 	genesisJson.Config.Gasless.AllowedTokens = ctx.StringSlice(gasless.AllowedTokensFlag.Name)
 
