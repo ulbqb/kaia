@@ -25,7 +25,6 @@ import (
 	"github.com/kaiachain/kaia/common"
 	"github.com/kaiachain/kaia/crypto"
 	"github.com/kaiachain/kaia/log"
-	"github.com/kaiachain/kaia/params"
 	"github.com/kaiachain/kaia/storage/database"
 	"github.com/stretchr/testify/require"
 )
@@ -59,11 +58,12 @@ func TestIsApproveTx(t *testing.T) {
 
 	g := NewGaslessModule()
 	key, _ := crypto.GenerateKey()
-	err := g.Init(&InitOpts{
-		ChainConfig: &params.ChainConfig{ChainID: big.NewInt(1)},
+	disabled, err := g.Init(&InitOpts{
+		ChainConfig: testChainConfig,
 		NodeKey:     key,
 		TxPool:      &testTxPool{},
 	})
+	require.False(t, disabled)
 	require.NoError(t, err)
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
@@ -98,11 +98,12 @@ func TestIsSwapTx(t *testing.T) {
 
 	g := NewGaslessModule()
 	key, _ := crypto.GenerateKey()
-	err := g.Init(&InitOpts{
-		ChainConfig: &params.ChainConfig{ChainID: big.NewInt(1)},
+	disabled, err := g.Init(&InitOpts{
+		ChainConfig: testChainConfig,
 		NodeKey:     key,
 		TxPool:      &testTxPool{},
 	})
+	require.False(t, disabled)
 	require.NoError(t, err)
 
 	for name, tc := range testcases {
@@ -171,11 +172,12 @@ func TestIsExecutable(t *testing.T) {
 	g := NewGaslessModule()
 	key, _ := crypto.GenerateKey()
 	sdb, _ := state.New(common.Hash{}, state.NewDatabase(database.NewMemoryDBManager()), nil, nil)
-	err := g.Init(&InitOpts{
-		ChainConfig: &params.ChainConfig{ChainID: big.NewInt(1)},
+	disabled, err := g.Init(&InitOpts{
+		ChainConfig: testChainConfig,
 		NodeKey:     key,
 		TxPool:      &testTxPool{sdb},
 	})
+	require.False(t, disabled)
 	require.NoError(t, err)
 
 	for name, tc := range testcases {

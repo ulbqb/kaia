@@ -45,18 +45,17 @@ func NewGaslessModule() *GaslessModule {
 	return &GaslessModule{}
 }
 
-func (g *GaslessModule) Init(opts *InitOpts) error {
+func (g *GaslessModule) Init(opts *InitOpts) (disabled bool, err error) {
 	if opts == nil || opts.ChainConfig == nil || opts.ChainConfig.Gasless == nil || opts.NodeKey == nil || opts.TxPool == nil {
-		return ErrInitUnexpectedNil
+		return true, ErrInitUnexpectedNil
 	}
 	g.InitOpts = *opts
 	g.swapRouters = map[common.Address]bool{}
 	g.allowedTokens = map[common.Address]bool{}
 	g.signer = types.LatestSignerForChainID(g.ChainConfig.ChainID)
 
-	// this module doesn't work if swap routers and allowed tokens are empty.
-	if opts.ChainConfig.Gasless.Disable {
-		return nil
+	if opts.ChainConfig.Gasless.IsDisabled {
+		return true, nil
 	}
 
 	for _, addr := range opts.ChainConfig.Gasless.SwapRouters {
@@ -66,7 +65,7 @@ func (g *GaslessModule) Init(opts *InitOpts) error {
 		g.allowedTokens[addr] = true
 	}
 
-	return nil
+	return false, nil
 }
 
 func (g *GaslessModule) Start() error {

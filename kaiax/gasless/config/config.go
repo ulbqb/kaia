@@ -43,7 +43,7 @@ var (
 type ChainConfig struct {
 	SwapRouters   []common.Address `json:"swapRouters"`
 	AllowedTokens []common.Address `json:"allowedTokens"`
-	Disable       bool             `json:"disable"`
+	IsDisabled    bool             `json:"isDisabled"`
 }
 
 func GenGenesis(ctx *cli.Context) *ChainConfig {
@@ -58,6 +58,6 @@ func GenGenesis(ctx *cli.Context) *ChainConfig {
 	return &ChainConfig{
 		SwapRouters:   swapRouters,
 		AllowedTokens: allowedTokens,
-		Disable:       ctx.Bool(DisableFlag.Name),
+		IsDisabled:    ctx.Bool(DisableFlag.Name),
 	}
 }

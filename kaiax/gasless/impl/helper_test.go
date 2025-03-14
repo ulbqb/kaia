@@ -31,9 +31,21 @@ import (
 	"github.com/kaiachain/kaia/crypto"
 	"github.com/kaiachain/kaia/event"
 	"github.com/kaiachain/kaia/kaiax/builder"
+	gasless_cfg "github.com/kaiachain/kaia/kaiax/gasless/config"
 	"github.com/kaiachain/kaia/kaiax/gov"
 	"github.com/kaiachain/kaia/params"
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	testChainConfig = &params.ChainConfig{
+		ChainID: big.NewInt(1),
+		Gasless: &gasless_cfg.ChainConfig{
+			SwapRouters:   []common.Address{common.HexToAddress("0x1234")},
+			AllowedTokens: []common.Address{common.HexToAddress("0xabcd")},
+			IsDisabled:    false,
+		},
+	}
 )
 
 type testBlockChain struct {

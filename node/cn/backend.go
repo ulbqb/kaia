@@ -543,14 +543,25 @@ func (s *CN) SetupKaiaxModules(ctx *node.ServiceContext) error {
 		mBuilder.Init(&builder_impl.InitOpts{
 			Backend: s.APIBackend,
 		}),
-		mGasless.Init(&gasless_impl.InitOpts{
-			ChainConfig: s.chainConfig,
-			NodeKey:     ctx.NodeKey(),
-			TxPool:      s.txPool,
-		}),
 	)
 	if err != nil {
 		return err
+	}
+
+	disabled, err := mGasless.Init(&gasless_impl.InitOpts{
+		ChainConfig: s.chainConfig,
+		NodeKey:     ctx.NodeKey(),
+		TxPool:      s.txPool,
+	})
+	if err != nil {
+		return err
+	}
+	mTxBundling := []builder.TxBundlingModule{}
+	mTxPool := []kaiax.TxPoolModule{}
+
+	if !disabled {
+		mTxBundling = append(mTxBundling, mGasless)
+		mTxPool = append(mTxPool, mGasless)
 	}
 
 	// Register modules to respective components
@@ -558,10 +569,10 @@ func (s *CN) SetupKaiaxModules(ctx *node.ServiceContext) error {
 	s.RegisterBaseModules(mStaking, mReward, mSupply, mGov, mValset, mRandao)
 	s.RegisterJsonRpcModules(mStaking, mReward, mSupply, mGov, mRandao, mBuilder)
 	s.miner.RegisterExecutionModule(mStaking, mSupply, mGov, mValset, mRandao)
-	s.miner.RegisterTxBundlingModule(mGasless)
+	s.miner.RegisterTxBundlingModule(mTxBundling...)
 	s.blockchain.RegisterExecutionModule(mStaking, mSupply, mGov, mValset, mRandao)
 	s.blockchain.RegisterRewindableModule(mStaking, mSupply, mGov, mValset, mRandao)
-	s.txPool.RegisterTxPoolModule(mGasless)
+	s.txPool.RegisterTxPoolModule(mTxPool...)
 	if engine, ok := s.engine.(consensus.Istanbul); ok {
 		engine.RegisterKaiaxModules(mGov, mStaking, mValset, mRandao)
 		engine.RegisterConsensusModule(mReward, mGov)

@@ -64,11 +64,12 @@ func TestIsModuleTx(t *testing.T) {
 
 	g := NewGaslessModule()
 	key, _ := crypto.GenerateKey()
-	err := g.Init(&InitOpts{
-		ChainConfig: &params.ChainConfig{ChainID: big.NewInt(1)},
+	disabled, err := g.Init(&InitOpts{
+		ChainConfig: testChainConfig,
 		NodeKey:     key,
 		TxPool:      &testTxPool{},
 	})
+	require.False(t, disabled)
 	require.NoError(t, err)
 
 	for _, tc := range testcases {
@@ -180,11 +181,12 @@ func TestIsReady(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			sdb, _ := state.New(common.Hash{}, state.NewDatabase(database.NewMemoryDBManager()), nil, nil)
 			sdb.SetNonce(addr, tc.nonce)
-			err := g.Init(&InitOpts{
-				ChainConfig: &params.ChainConfig{ChainID: big.NewInt(1)},
+			disabled, err := g.Init(&InitOpts{
+				ChainConfig: testChainConfig,
 				NodeKey:     nodeKey,
 				TxPool:      &testTxPool{sdb},
 			})
+			require.False(t, disabled)
 			require.NoError(t, err)
 			ok := g.IsReady(tc.queue, tc.i, tc.ready)
 			require.Equal(t, tc.expected, ok)
@@ -313,11 +315,12 @@ func TestPromoteGaslessTransactions(t *testing.T) {
 		pool := blockchain.NewTxPool(testTxPoolConfig, chainConfig, bc, &dummyGovModule{chainConfig: chainConfig})
 		g := NewGaslessModule()
 		nodeKey, _ := crypto.GenerateKey()
-		err := g.Init(&InitOpts{
-			ChainConfig: &params.ChainConfig{ChainID: big.NewInt(1)},
+		disabled, err := g.Init(&InitOpts{
+			ChainConfig: testChainConfig,
 			NodeKey:     nodeKey,
 			TxPool:      pool,
 		})
+		require.False(t, disabled)
 		require.NoError(t, err)
 		pool.RegisterTxPoolModule(g)
 		txMap := map[txTypeTest]*types.Transaction{}
