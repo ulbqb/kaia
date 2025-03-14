@@ -39,7 +39,6 @@ type GaslessModule struct {
 	swapRouters   map[common.Address]bool
 	allowedTokens map[common.Address]bool
 	signer        types.Signer
-	disable       bool
 }
 
 func NewGaslessModule() *GaslessModule {
@@ -47,17 +46,26 @@ func NewGaslessModule() *GaslessModule {
 }
 
 func (g *GaslessModule) Init(opts *InitOpts) error {
-	if opts == nil || opts.ChainConfig == nil || opts.NodeKey == nil || opts.TxPool == nil {
+	if opts == nil || opts.ChainConfig == nil || opts.ChainConfig.Gasless == nil || opts.NodeKey == nil || opts.TxPool == nil {
 		return ErrInitUnexpectedNil
 	}
 	g.InitOpts = *opts
+	g.swapRouters = map[common.Address]bool{}
+	g.allowedTokens = map[common.Address]bool{}
+	g.signer = types.LatestSignerForChainID(g.ChainConfig.ChainID)
+
+	// this module doesn't work if swap routers and allowed tokens are empty.
+	if opts.ChainConfig.Gasless.Disable {
+		return nil
+	}
+
 	for _, addr := range opts.ChainConfig.Gasless.SwapRouters {
 		g.swapRouters[addr] = true
 	}
 	for _, addr := range opts.ChainConfig.Gasless.AllowedTokens {
 		g.allowedTokens[addr] = true
 	}
-	g.signer = types.LatestSignerForChainID(g.ChainConfig.ChainID)
+
 	return nil
 }
 

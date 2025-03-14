@@ -144,6 +144,7 @@ var HomiFlags = []cli.Flag{
 	altsrc.NewBoolFlag(registryMockFlag),
 	altsrc.NewStringSliceFlag(gasless.SwapRoutersFlag),
 	altsrc.NewStringSliceFlag(gasless.AllowedTokensFlag),
+	altsrc.NewBoolFlag(gasless.DisableFlag),
 }
 
 var SetupCommand = &cli.Command{

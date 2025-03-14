@@ -21,21 +21,29 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var (
+	SwapRoutersFlag = &cli.StringSliceFlag{
+		Name:    "gasless.swap-routers",
+		Usage:   "swap router addresses for gasless module",
+		Aliases: []string{"genesis.module.gasless.swap-routers"},
+	}
+	AllowedTokensFlag = &cli.StringSliceFlag{
+		Name:    "gasless.allowed-tokens",
+		Usage:   "allowed token addresses for gasless module",
+		Aliases: []string{"genesis.module.gasless.allowed-tokens"},
+	}
+	DisableFlag = &cli.BoolFlag{
+		Name:    "gasless.disable",
+		Usage:   "disable gasless module",
+		Value:   false,
+		Aliases: []string{"genesis.module.gasless.disable"},
+	}
+)
+
 type ChainConfig struct {
 	SwapRouters   []common.Address `json:"swapRouters"`
 	AllowedTokens []common.Address `json:"allowedTokens"`
-}
-
-var SwapRoutersFlag = &cli.StringSliceFlag{
-	Name:    "gasless.swap-routers",
-	Usage:   "SwapRouters for gasless module",
-	Aliases: []string{"genesis.module.gasless.swap-routers"},
-}
-
-var AllowedTokensFlag = &cli.StringSliceFlag{
-	Name:    "gasless.allowed-tokens",
-	Usage:   "AllowedTokens for gasless module",
-	Aliases: []string{"genesis.module.gasless.allowed-tokens"},
+	Disable       bool             `json:"disable"`
 }
 
 func GenGenesis(ctx *cli.Context) *ChainConfig {
@@ -50,5 +58,6 @@ func GenGenesis(ctx *cli.Context) *ChainConfig {
 	return &ChainConfig{
 		SwapRouters:   swapRouters,
 		AllowedTokens: allowedTokens,
+		Disable:       ctx.Bool(DisableFlag.Name),
 	}
 }
