@@ -23,7 +23,6 @@ import (
 
 //go:generate mockgen -destination=./mock/module.go -package=mock github.com/kaiachain/kaia/kaiax/gasless GaslessModule
 type GaslessModule interface {
-	kaiax.BaseModule
 	kaiax.TxPoolModule
 	builder.TxBundlingModule
 }
