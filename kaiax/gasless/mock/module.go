@@ -63,18 +63,18 @@ func (mr *MockGaslessModuleMockRecorder) GetCheckBalance() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCheckBalance", reflect.TypeOf((*MockGaslessModule)(nil).GetCheckBalance))
 }
 
-// IsBuildingModuleTx mocks base method.
-func (m *MockGaslessModule) IsBuildingModuleTx(arg0 *types.Transaction) bool {
+// IsBundleTx mocks base method.
+func (m *MockGaslessModule) IsBundleTx(arg0 *types.Transaction) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsBuildingModuleTx", arg0)
+	ret := m.ctrl.Call(m, "IsBundleTx", arg0)
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-// IsBuildingModuleTx indicates an expected call of IsBuildingModuleTx.
-func (mr *MockGaslessModuleMockRecorder) IsBuildingModuleTx(arg0 interface{}) *gomock.Call {
+// IsBundleTx indicates an expected call of IsBundleTx.
+func (mr *MockGaslessModuleMockRecorder) IsBundleTx(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsBuildingModuleTx", reflect.TypeOf((*MockGaslessModule)(nil).IsBuildingModuleTx), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsBundleTx", reflect.TypeOf((*MockGaslessModule)(nil).IsBundleTx), arg0)
 }
 
 // IsModuleTx mocks base method.

@@ -67,6 +67,6 @@ func (g *GaslessModule) ExtractTxBundles(txs []*types.Transaction, prevBundles [
 	return bundles
 }
 
-func (g *GaslessModule) IsBuildingModuleTx(tx *types.Transaction) bool {
+func (g *GaslessModule) IsBundleTx(tx *types.Transaction) bool {
 	return g.IsModuleTx(tx)
 }

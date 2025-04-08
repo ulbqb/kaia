@@ -32,7 +32,7 @@ func (b *BuilderModule) PreAddTx(tx *types.Transaction, local bool) error {
 		return errors.New("Unable to add known bundle tx into tx pool during lock period")
 	}
 	for _, module := range b.Modules {
-		if module.IsBuildingModuleTx(tx) {
+		if module.IsBundleTx(tx) {
 			newTxTime := txAndTime{
 				tx:   tx,
 				time: time.Now(),
@@ -52,7 +52,7 @@ func (b *BuilderModule) IsModuleTx(tx *types.Transaction) bool {
 		return true
 	}
 	for _, module := range b.Modules {
-		if module.IsBuildingModuleTx(tx) {
+		if module.IsBundleTx(tx) {
 			return true
 		}
 	}
