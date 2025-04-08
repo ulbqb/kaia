@@ -574,6 +574,8 @@ func (s *CN) SetupKaiaxModules(ctx *node.ServiceContext, mValset valset.ValsetMo
 		return err
 	}
 
+	mTxPool = mBuilder.MakeBuilderWrappingModuleIfNeeded(mTxBundling, mTxPool)
+
 	// Register modules to respective components
 	// TODO-kaiax: Organize below lines.
 	s.RegisterBaseModules(s.stakingModule, mReward, mSupply, s.govModule, mValset, mRandao)
