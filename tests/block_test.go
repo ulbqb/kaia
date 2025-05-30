@@ -76,6 +76,7 @@ func (suite *ExecutionSpecBlockTestSuite) TestExecutionSpecBlock() {
 	// type 3 tx (EIP-4844) is not supported
 	bt.skipLoad(`^prague\/eip7623_increase_calldata_cost\/.*type_3.*`)
 	bt.skipLoad(`^prague\/eip7702_set_code_tx\/set_code_txs\/eoa_tx_after_set_code.json\/tests\/prague\/eip7702_set_code_tx\/test_set_code_txs.py::test_eoa_tx_after_set_code\[fork_Prague-tx_type_3-evm_code_type_LEGACY-blockchain_test\]`)
+	bt.skipLoad(`^prague\/eip7702_set_code_tx\/set_code_txs\/set_code_transaction_fee_validations.json\/tests\/prague\/eip7702_set_code_tx\/test_set_code_txs.py::test_set_code_transaction_fee_validations\[fork_Prague-blockchain_test_from_state_test-insufficient_max_fee_per_gas\]`)
 
 	bt.walk(t, executionSpecBlockTestDir, func(t *testing.T, name string, test *BlockTest) {
 		skipForks := []string{
