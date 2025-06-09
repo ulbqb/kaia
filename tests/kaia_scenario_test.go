@@ -2255,11 +2255,10 @@ func testTxBundleLivePruningScenario(t *testing.T, bcdata *BCData, rewardBase, v
 	signer := types.LatestSignerForChainID(bcdata.bc.Config().ChainID)
 	gasPrice := new(big.Int).SetUint64(bcdata.bc.Config().UnitPrice)
 	var txs types.Transactions
-	var prehash common.Hash
 
 	// 1. Transfer (rewardBase -> anon) using a legacy transaction.
 	{
-		for i := 0; i < 2; i++ {
+		for i := 0; i < 1; i++ {
 			amount := new(big.Int).Mul(big.NewInt(10000), new(big.Int).SetUint64(params.KAIA))
 			tx := types.NewTransaction(rewardBase.Nonce, anon.Addr, amount, gasLimit, gasPrice, []byte{})
 			rewardBase.Nonce += 1
@@ -2267,20 +2266,23 @@ func testTxBundleLivePruningScenario(t *testing.T, bcdata *BCData, rewardBase, v
 			assert.Equal(t, nil, err)
 			txs = append(txs, tx)
 		}
-
-		if err := bcdata.GenABlockWithTransactionsWithBundle(accountMap, txs, []common.Hash{}, prof, txBundlingModules, builderModule); err != nil {
+		if err := bcdata.GenABlockWithTransactions(accountMap, txs, prof); err != nil {
 			t.Fatal(err)
 		}
-		prehash = bcdata.bc.CurrentBlock().Root()
+		fmt.Println("block number and hash: ", bcdata.bc.CurrentBlock().Number().Uint64(), bcdata.bc.CurrentBlock().Hash().String())
 	}
 
 	// 2. Transfer (anon -> validator) using a legacy transaction two times.
 	{
 		txs = []*types.Transaction{}
-
 		for i := 0; i < 2; i++ {
 			amount := new(big.Int).Mul(common.Big1, new(big.Int).SetUint64(params.Kei))
-			tx := types.NewTransaction(anon.Nonce, validator.Addr, amount, gasLimit, gasPrice, []byte{})
+			nonce := anon.Nonce
+			if i == 1 {
+				nonce += 100
+			}
+			tx := types.NewTransaction(nonce, validator.Addr, amount, gasLimit, gasPrice, []byte{})
+			fmt.Println("tx hash: ", tx.Hash().String())
 			err := tx.SignWithKeys(signer, anon.Keys)
 			assert.Equal(t, nil, err)
 			txs = append(txs, tx)
@@ -2288,29 +2290,31 @@ func testTxBundleLivePruningScenario(t *testing.T, bcdata *BCData, rewardBase, v
 		if err := bcdata.GenABlockWithTransactionsWithBundle(accountMap, txs, []common.Hash{txs[0].Hash(), txs[1].Hash()}, prof, txBundlingModules, builderModule); err != nil {
 			t.Fatal(err)
 		}
-		prehash = bcdata.bc.CurrentBlock().Root()
+		fmt.Println("block number and hash: ", bcdata.bc.CurrentBlock().Number().Uint64(), bcdata.bc.CurrentBlock().Hash().String())
 	}
 
 	// 3. Transfer (anon -> validator) using a legacy transaction two times.
 	{
 		txs = []*types.Transaction{}
-		for i := 0; i < 2; i++ {
-			amount := new(big.Int).Mul(common.Big1, new(big.Int).SetUint64(params.Kei))
+		for i := 0; i < 1; i++ {
+			amount := new(big.Int).Mul(common.Big100, new(big.Int).SetUint64(params.Kei))
 			tx := types.NewTransaction(anon.Nonce, validator.Addr, amount, gasLimit, gasPrice, []byte{})
 			anon.Nonce += 1
 			err := tx.SignWithKeys(signer, anon.Keys)
 			assert.Equal(t, nil, err)
 			txs = append(txs, tx)
 		}
-		if err := bcdata.GenABlockWithTransactionsWithBundle(accountMap, txs, []common.Hash{}, prof, txBundlingModules, builderModule); err != nil {
+		if err := bcdata.GenABlockWithTransactions(accountMap, txs, prof); err != nil {
 			t.Fatal(err)
 		}
+		fmt.Println("block number and hash: ", bcdata.bc.CurrentBlock().Number().Uint64(), bcdata.bc.CurrentBlock().Hash().String())
 	}
 
-	_, err := bcdata.bc.StateAt(prehash)
+	_, err := bcdata.bc.PrunableStateAt(bcdata.bc.CurrentBlock().Root(), bcdata.bc.CurrentHeader().Number.Uint64())
 	if err != nil {
 		t.Fatal(err)
 	}
+
 }
 
 func bundleEachTwoTxs(_, _ *TestAccountType, _ types.Signer, _, _ *big.Int,

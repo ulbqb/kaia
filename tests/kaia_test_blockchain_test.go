@@ -243,7 +243,7 @@ func (bcdata *BCData) MineABlock(transactions types.Transactions, signer types.S
 	}
 	prof.Profile("mine_prepareHeader", time.Now().Sub(start))
 
-	statedb, err := bcdata.bc.State()
+	statedb, err := bcdata.bc.PrunableStateAt(bcdata.bc.CurrentBlock().Root(), bcdata.bc.CurrentBlock().NumberU64())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -330,7 +330,7 @@ func (bcdata *BCData) GenABlockWithTxpool(accountMap *AccountMap, txpool *blockc
 	}
 	prof.Profile("mine_prepareHeader", time.Now().Sub(start))
 
-	statedb, err := bcdata.bc.State()
+	statedb, err := bcdata.bc.PrunableStateAt(bcdata.bc.CurrentBlock().Root(), bcdata.bc.CurrentBlock().NumberU64())
 	if err != nil {
 		return err
 	}
@@ -404,7 +404,7 @@ func (bcdata *BCData) GenABlockWithTxpool(accountMap *AccountMap, txpool *blockc
 
 	// Verification with accountMap
 	start = time.Now()
-	statedbNew, err := bcdata.bc.State()
+	statedbNew, err := bcdata.bc.PrunableStateAt(bcdata.bc.CurrentBlock().Root(), bcdata.bc.CurrentBlock().NumberU64())
 	if err != nil {
 		return err
 	}
@@ -433,7 +433,7 @@ func (bcdata *BCData) genABlockWithTransactionsWithBundle(accountMap *AccountMap
 ) error {
 	signer := types.MakeSigner(bcdata.bc.Config(), bcdata.bc.CurrentHeader().Number)
 
-	statedb, err := bcdata.bc.State()
+	statedb, err := bcdata.bc.PrunableStateAt(bcdata.bc.CurrentBlock().Root(), bcdata.bc.CurrentBlock().NumberU64())
 	if err != nil {
 		return err
 	}
@@ -501,7 +501,7 @@ func (bcdata *BCData) genABlockWithTransactionsWithBundle(accountMap *AccountMap
 
 	// Verification with accountMap
 	start = time.Now()
-	statedb, err = bcdata.bc.State()
+	statedb, err = bcdata.bc.PrunableStateAt(bcdata.bc.CurrentBlock().Root(), bcdata.bc.CurrentBlock().NumberU64())
 	if err != nil {
 		return err
 	}
