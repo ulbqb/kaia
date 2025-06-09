@@ -1968,9 +1968,9 @@ func TestTxBundle(t *testing.T) {
 			// Initialize blockchain
 			start := time.Now()
 			cacheConfig := &blockchain.CacheConfig{
-				ArchiveMode:          true,
+				ArchiveMode:          false,
 				CacheSize:            512,
-				BlockInterval:        blockchain.DefaultBlockInterval,
+				BlockInterval:        1,
 				TriesInMemory:        blockchain.DefaultTriesInMemory,
 				LivePruningRetention: 1,
 				TrieNodeCacheConfig:  statedb.GetEmptyTrieNodeCacheConfig(),
