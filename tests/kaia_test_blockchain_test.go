@@ -79,7 +79,7 @@ var (
 	nodeAddr = common.StringToAddress("nodeAddr")
 )
 
-func NewBCDataWithForkConfig(maxAccounts, numValidators int, chainCfg *params.ChainConfig) (*BCData, error) {
+func NewBCDataWithConfigs(maxAccounts, numValidators int, chainCfg *params.ChainConfig, cacheConfig *blockchain.CacheConfig) (*BCData, error) {
 	if chainCfg == nil {
 		return nil, errors.New("chainConfig is nil")
 	}
@@ -130,7 +130,7 @@ func NewBCDataWithForkConfig(maxAccounts, numValidators int, chainCfg *params.Ch
 	})
 	////////////////////////////////////////////////////////////////////////////////
 	// Make a blockchain
-	bc, genesis, err := initBlockChain(chainDb, nil, addrs, validatorAddresses, nil, engine, chainCfg)
+	bc, genesis, err := initBlockChain(chainDb, cacheConfig, addrs, validatorAddresses, nil, engine, chainCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func NewBCDataWithForkConfig(maxAccounts, numValidators int, chainCfg *params.Ch
 
 // NewBCData enables all hardforks except randao hardfork
 func NewBCData(maxAccounts, numValidators int) (*BCData, error) {
-	return NewBCDataWithForkConfig(maxAccounts, numValidators, Forks["Byzantium"])
+	return NewBCDataWithConfigs(maxAccounts, numValidators, Forks["Byzantium"], nil) // Forks["Byzantium"] is ok?
 }
 
 func (bcdata *BCData) Shutdown() {

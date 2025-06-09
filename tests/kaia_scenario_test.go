@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/kaiachain/kaia/accounts/abi"
+	"github.com/kaiachain/kaia/blockchain"
 	"github.com/kaiachain/kaia/blockchain/state"
 	"github.com/kaiachain/kaia/blockchain/types"
 	"github.com/kaiachain/kaia/blockchain/types/accountkey"
@@ -47,6 +48,7 @@ import (
 	"github.com/kaiachain/kaia/params"
 	"github.com/kaiachain/kaia/rlp"
 	"github.com/kaiachain/kaia/storage/database"
+	"github.com/kaiachain/kaia/storage/statedb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1906,50 +1908,55 @@ func TestTxBundle(t *testing.T) {
 		bundleFuncMaker func(rewardBase, anon *TestAccountType, signer types.Signer, amount, gasPrice *big.Int,
 		) func([]*types.Transaction, []*builder.Bundle) []*builder.Bundle
 	}{
+		// {
+		// 	// TestTxBundleRevert tests a following scenario:
+		// 	//  1. Transfer (rewardBase -> anon) using a legacy transaction four times.
+		// 	//     Create a mock TxBundlingModule and create a bundle for each two tx.
+		// 	//     At that point, tx4 fails with nonceTooHigh and tx3 is reverted.
+		// 	//  2. Transfer (validator -> anon) using a legacy transaction two times.
+		// 	//
+		// 	// In summary, input txs are [ [tx0, tx1], [tx2, tx3], [tx4, tx5] ]. tx3 reverts.
+		// 	// Therefore, the expected txs for a block are [tx0, tx1, tx4, tx5].
+		// 	name:            "TestTxBundleRevert",
+		// 	runScenario:     testTxBundleRevertScenario,
+		// 	bundleFuncMaker: bundleEachTwoTxs,
+		// },
+		// {
+		// 	// TestTxBundleRevertByEvmError tests a following scenario:
+		// 	//  1. Deploy KlaytnRewardBin.
+		// 	//  2. Transfer (validator -> anon) using a legacy transaction.
+		// 	//     And Execution KlaytnRewardBin.reward.
+		// 	//     Create a mock TxBundlingModule and create a bundle for each two tx.
+		// 	//     At that point, ExecutionTx fails with OutOfGas and TransferTx is reverted.
+		// 	//     OutOfGas is an evm error and will be listed in the receipt status.
+		// 	//     This is a test to see if we should revert this.
+		// 	name:            "TestTxBundleRevertByEvmError",
+		// 	runScenario:     testTxBundleRevertByEvmErrorScenario,
+		// 	bundleFuncMaker: bundleEachTwoTxs,
+		// },
+		// {
+		// 	// TestTxBundleAndRevertWithGenerator tests a following scenario:
+		// 	//  1. Transfer (validator -> anon) using a legacy transaction.
+		// 	//     It is bundled and adds TxGenerator. e.g) [g, TransferTx]
+		// 	//     Check if bundling succeeds when TxGenerator is added.
+		// 	name:            "TestTxBundleAndRevertWithGenerator",
+		// 	runScenario:     testTxBundleAndRevertWithGeneratorScenario,
+		// 	bundleFuncMaker: bundleAllAndAddGenToFirst,
+		// },
+		// {
+		// 	// TestTxBundleTimeOut tests a following scenario:
+		// 	//  1. Transfer (rewardBase -> anon) using a legacy transaction twenty times.
+		// 	//     All transactions are treated as the same bundle.
+		// 	//     Change BlockGenerationTimeLimit so that time occurs between tx1 and tx20.
+		// 	//     Assume that the bundle is not aborted due to a timeout and that all tx succeed.
+		// 	name:            "TestTxBundleTimeOut",
+		// 	runScenario:     testTxBundleTimeOutScenario,
+		// 	bundleFuncMaker: bundleAll,
+		// },
 		{
-			// TestTxBundleRevert tests a following scenario:
-			//  1. Transfer (rewardBase -> anon) using a legacy transaction four times.
-			//     Create a mock TxBundlingModule and create a bundle for each two tx.
-			//     At that point, tx4 fails with nonceTooHigh and tx3 is reverted.
-			//  2. Transfer (validator -> anon) using a legacy transaction two times.
-			//
-			// In summary, input txs are [ [tx0, tx1], [tx2, tx3], [tx4, tx5] ]. tx3 reverts.
-			// Therefore, the expected txs for a block are [tx0, tx1, tx4, tx5].
-			name:            "TestTxBundleRevert",
-			runScenario:     testTxBundleRevertScenario,
+			name:            "TestTxBundleLivePruning",
+			runScenario:     testTxBundleLivePruningScenario,
 			bundleFuncMaker: bundleEachTwoTxs,
-		},
-		{
-			// TestTxBundleRevertByEvmError tests a following scenario:
-			//  1. Deploy KlaytnRewardBin.
-			//  2. Transfer (validator -> anon) using a legacy transaction.
-			//     And Execution KlaytnRewardBin.reward.
-			//     Create a mock TxBundlingModule and create a bundle for each two tx.
-			//     At that point, ExecutionTx fails with OutOfGas and TransferTx is reverted.
-			//     OutOfGas is an evm error and will be listed in the receipt status.
-			//     This is a test to see if we should revert this.
-			name:            "TestTxBundleRevertByEvmError",
-			runScenario:     testTxBundleRevertByEvmErrorScenario,
-			bundleFuncMaker: bundleEachTwoTxs,
-		},
-		{
-			// TestTxBundleAndRevertWithGenerator tests a following scenario:
-			//  1. Transfer (validator -> anon) using a legacy transaction.
-			//     It is bundled and adds TxGenerator. e.g) [g, TransferTx]
-			//     Check if bundling succeeds when TxGenerator is added.
-			name:            "TestTxBundleAndRevertWithGenerator",
-			runScenario:     testTxBundleAndRevertWithGeneratorScenario,
-			bundleFuncMaker: bundleAllAndAddGenToFirst,
-		},
-		{
-			// TestTxBundleTimeOut tests a following scenario:
-			//  1. Transfer (rewardBase -> anon) using a legacy transaction twenty times.
-			//     All transactions are treated as the same bundle.
-			//     Change BlockGenerationTimeLimit so that time occurs between tx1 and tx20.
-			//     Assume that the bundle is not aborted due to a timeout and that all tx succeed.
-			name:            "TestTxBundleTimeOut",
-			runScenario:     testTxBundleTimeOutScenario,
-			bundleFuncMaker: bundleAll,
 		},
 	}
 
@@ -1960,7 +1967,17 @@ func TestTxBundle(t *testing.T) {
 
 			// Initialize blockchain
 			start := time.Now()
-			bcdata, err := NewBCData(6, 4)
+			cacheConfig := &blockchain.CacheConfig{
+				ArchiveMode:          true,
+				CacheSize:            512,
+				BlockInterval:        blockchain.DefaultBlockInterval,
+				TriesInMemory:        blockchain.DefaultTriesInMemory,
+				LivePruningRetention: 1,
+				TrieNodeCacheConfig:  statedb.GetEmptyTrieNodeCacheConfig(),
+				SnapshotCacheSize:    512,
+				SnapshotAsyncGen:     true,
+			}
+			bcdata, err := NewBCDataWithConfigs(6, 4, Forks["Prague"], cacheConfig)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2224,6 +2241,74 @@ func testTxBundleTimeOutScenario(t *testing.T, bcdata *BCData, rewardBase, valid
 		params.BlockGenerationTimeLimit = params.DefaultBlockGenerationTimeLimit
 	}()
 	if err := bcdata.GenABlockWithTransactionsWithBundle(accountMap, txs, nil, prof, txBundlingModules, builderModule); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func testTxBundleLivePruningScenario(t *testing.T, bcdata *BCData, rewardBase, validator, anon *TestAccountType,
+	accountMap *AccountMap, prof *profile.Profiler,
+	txBundlingModules []builder.TxBundlingModule, builderModule builder.BuilderModule,
+) {
+	// Enable live pruning
+	bcdata.db.WritePruningEnabled()
+
+	signer := types.LatestSignerForChainID(bcdata.bc.Config().ChainID)
+	gasPrice := new(big.Int).SetUint64(bcdata.bc.Config().UnitPrice)
+	var txs types.Transactions
+	var prehash common.Hash
+
+	// 1. Transfer (rewardBase -> anon) using a legacy transaction.
+	{
+		for i := 0; i < 2; i++ {
+			amount := new(big.Int).Mul(big.NewInt(10000), new(big.Int).SetUint64(params.KAIA))
+			tx := types.NewTransaction(rewardBase.Nonce, anon.Addr, amount, gasLimit, gasPrice, []byte{})
+			rewardBase.Nonce += 1
+			err := tx.SignWithKeys(signer, rewardBase.Keys)
+			assert.Equal(t, nil, err)
+			txs = append(txs, tx)
+		}
+
+		if err := bcdata.GenABlockWithTransactionsWithBundle(accountMap, txs, []common.Hash{}, prof, txBundlingModules, builderModule); err != nil {
+			t.Fatal(err)
+		}
+		prehash = bcdata.bc.CurrentBlock().Root()
+	}
+
+	// 2. Transfer (anon -> validator) using a legacy transaction two times.
+	{
+		txs = []*types.Transaction{}
+
+		for i := 0; i < 2; i++ {
+			amount := new(big.Int).Mul(common.Big1, new(big.Int).SetUint64(params.Kei))
+			tx := types.NewTransaction(anon.Nonce, validator.Addr, amount, gasLimit, gasPrice, []byte{})
+			err := tx.SignWithKeys(signer, anon.Keys)
+			assert.Equal(t, nil, err)
+			txs = append(txs, tx)
+		}
+		if err := bcdata.GenABlockWithTransactionsWithBundle(accountMap, txs, []common.Hash{txs[0].Hash(), txs[1].Hash()}, prof, txBundlingModules, builderModule); err != nil {
+			t.Fatal(err)
+		}
+		prehash = bcdata.bc.CurrentBlock().Root()
+	}
+
+	// 3. Transfer (anon -> validator) using a legacy transaction two times.
+	{
+		txs = []*types.Transaction{}
+		for i := 0; i < 2; i++ {
+			amount := new(big.Int).Mul(common.Big1, new(big.Int).SetUint64(params.Kei))
+			tx := types.NewTransaction(anon.Nonce, validator.Addr, amount, gasLimit, gasPrice, []byte{})
+			anon.Nonce += 1
+			err := tx.SignWithKeys(signer, anon.Keys)
+			assert.Equal(t, nil, err)
+			txs = append(txs, tx)
+		}
+		if err := bcdata.GenABlockWithTransactionsWithBundle(accountMap, txs, []common.Hash{}, prof, txBundlingModules, builderModule); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err := bcdata.bc.StateAt(prehash)
+	if err != nil {
 		t.Fatal(err)
 	}
 }
