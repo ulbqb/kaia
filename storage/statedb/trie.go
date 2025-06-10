@@ -606,11 +606,13 @@ func (t *Trie) markPrunableNode(n node) {
 	}
 
 	if hn, ok := n.(hashNode); ok {
+		fmt.Println("hoge markPrunableNode", t.PruningBlockNumber, common.BytesToExtHash(hn).Hex())
 		// If a node exists as a hashNode, it means the node is either:
 		// (1) lives in database but yet to be resolved - subject to pruning,
 		// (2) collapsed by Hash or Commit - may or may not be in database, add the mark anyway.
 		t.pruningMarksCache[common.BytesToExtHash(hn)] = t.PruningBlockNumber
 	} else if hn, _ := n.cache(); hn != nil {
+		fmt.Println("hoge markPrunableNode cache", t.PruningBlockNumber, common.BytesToExtHash(hn).Hex())
 		// If node.flags.hash is nonempty, it means the node is either:
 		// (1) loaded from databas - subject to pruning,
 		// (2) went through hasher by Hash or Commit - may or may not be in database, add the mark anyway.

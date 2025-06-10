@@ -30,6 +30,7 @@ import (
 	mrand "math/rand"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -751,6 +752,8 @@ func (bc *BlockChain) StateAt(root common.Hash) (*state.StateDB, error) {
 // PrunableStateAt returns a new mutable state based on a particular point in time.
 // If live pruning is enabled on the databse, and num is nonzero, then trie will mark obsolete nodes for pruning.
 func (bc *BlockChain) PrunableStateAt(root common.Hash, num uint64) (*state.StateDB, error) {
+	fmt.Printf("hoge PrunableStateAt %x %d \n", root, num)
+	debug.PrintStack()
 	if bc.IsLivePruningRequired() {
 		return state.New(root, bc.stateCache, bc.snaps, &statedb.TrieOpts{
 			PruningBlockNumber: num,
@@ -758,6 +761,12 @@ func (bc *BlockChain) PrunableStateAt(root common.Hash, num uint64) (*state.Stat
 	} else {
 		return bc.StateAt(root)
 	}
+}
+
+func (bc *BlockChain) TestStateAt(root common.Hash, num uint64) (*state.StateDB, error) {
+	return state.New(root, bc.stateCache, nil, &statedb.TrieOpts{
+		PruningBlockNumber: num,
+	})
 }
 
 // StateAtWithPersistent returns a new mutable state based on a particular point in time with persistent trie nodes.
@@ -1366,6 +1375,7 @@ func (bc *BlockChain) writeReceipts(hash common.Hash, number uint64, receipts ty
 // If an archiving node is running, it always flushes state trie to DB.
 // If not, it flushes state trie to DB periodically. (period = bc.cacheConfig.BlockInterval)
 func (bc *BlockChain) writeStateTrie(block *types.Block, state *state.StateDB) error {
+	fmt.Println("hoge writeStateTrie")
 	state.LockGCCachedNode()
 	defer state.UnlockGCCachedNode()
 
@@ -1401,6 +1411,7 @@ func (bc *BlockChain) writeStateTrie(block *types.Block, state *state.StateDB) e
 		trieDBNodesSizeBytesGauge.Update(int64(nodesSize))
 		trieDBPreimagesSizeGauge.Update(int64(preimagesSize))
 
+		fmt.Println("hoge writeStateTrie", nodesSize, nodesSizeLimit, preimagesSize)
 		if nodesSize > nodesSizeLimit || preimagesSize > 4*1024*1024 {
 			// NOTE-Kaia Not to change the original behavior, error is not returned.
 			// Error should be returned if it is thought to be safe in the future.
@@ -1692,6 +1703,7 @@ func (bc *BlockChain) writeBlockWithStateSerial(block *types.Block, receipts []*
 
 // writeBlockWithStateParallel writes the block and all associated state to the database using goroutines.
 func (bc *BlockChain) writeBlockWithStateParallel(block *types.Block, receipts []*types.Receipt, state *state.StateDB) (WriteResult, error) {
+	fmt.Println("hoge writeBlockWithStateParallel")
 	start := time.Now()
 	bc.wg.Add(1)
 	defer bc.wg.Done()
@@ -1839,6 +1851,7 @@ func (bc *BlockChain) GetTxReceiptInCache(txHash common.Hash) *types.Receipt {
 //
 // After insertion is done, all accumulated events will be fired.
 func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
+	fmt.Println("hoge InsertChain")
 	n, events, logs, err := bc.insertChain(chain)
 	bc.PostChainEvents(events, logs)
 	return n, err
@@ -2740,6 +2753,7 @@ func (bc *BlockChain) SaveTrieNodeCacheToDisk() error {
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
 func (bc *BlockChain) ApplyTransaction(chainConfig *params.ChainConfig, author *common.Address, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, vmConfig *vm.Config) (*types.Receipt, *vm.InternalTxTrace, error) {
+	fmt.Println("hoge ApplyTransaction")
 	// TODO-Kaia We reject transactions with unexpected gasPrice and do not put the transaction into TxPool.
 	//         And we run transactions regardless of gasPrice if we push transactions in the TxPool.
 	/*

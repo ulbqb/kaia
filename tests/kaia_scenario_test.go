@@ -1969,7 +1969,7 @@ func TestTxBundle(t *testing.T) {
 			start := time.Now()
 			cacheConfig := &blockchain.CacheConfig{
 				ArchiveMode:          false,
-				CacheSize:            512,
+				CacheSize:            0,
 				BlockInterval:        1,
 				TriesInMemory:        blockchain.DefaultTriesInMemory,
 				LivePruningRetention: 1,
@@ -2275,10 +2275,13 @@ func testTxBundleLivePruningScenario(t *testing.T, bcdata *BCData, rewardBase, v
 	// 2. Transfer (anon -> validator) using a legacy transaction two times.
 	{
 		txs = []*types.Transaction{}
-		for i := 0; i < 2; i++ {
+		for i := 0; i < 3; i++ {
 			amount := new(big.Int).Mul(common.Big1, new(big.Int).SetUint64(params.Kei))
 			nonce := anon.Nonce
 			if i == 1 {
+				nonce += 1
+			}
+			if i == 2 {
 				nonce += 100
 			}
 			tx := types.NewTransaction(nonce, validator.Addr, amount, gasLimit, gasPrice, []byte{})
@@ -2287,34 +2290,11 @@ func testTxBundleLivePruningScenario(t *testing.T, bcdata *BCData, rewardBase, v
 			assert.Equal(t, nil, err)
 			txs = append(txs, tx)
 		}
-		if err := bcdata.GenABlockWithTransactionsWithBundle(accountMap, txs, []common.Hash{txs[0].Hash(), txs[1].Hash()}, prof, txBundlingModules, builderModule); err != nil {
+		if err := bcdata.GenABlockWithTransactionsWithBundle(accountMap, txs, []common.Hash{txs[0].Hash(), txs[1].Hash(), txs[2].Hash()}, prof, txBundlingModules, builderModule); err != nil {
 			t.Fatal(err)
 		}
 		fmt.Println("block number and hash: ", bcdata.bc.CurrentBlock().Number().Uint64(), bcdata.bc.CurrentBlock().Hash().String())
 	}
-
-	// 3. Transfer (anon -> validator) using a legacy transaction two times.
-	{
-		txs = []*types.Transaction{}
-		for i := 0; i < 1; i++ {
-			amount := new(big.Int).Mul(common.Big100, new(big.Int).SetUint64(params.Kei))
-			tx := types.NewTransaction(anon.Nonce, validator.Addr, amount, gasLimit, gasPrice, []byte{})
-			anon.Nonce += 1
-			err := tx.SignWithKeys(signer, anon.Keys)
-			assert.Equal(t, nil, err)
-			txs = append(txs, tx)
-		}
-		if err := bcdata.GenABlockWithTransactions(accountMap, txs, prof); err != nil {
-			t.Fatal(err)
-		}
-		fmt.Println("block number and hash: ", bcdata.bc.CurrentBlock().Number().Uint64(), bcdata.bc.CurrentBlock().Hash().String())
-	}
-
-	_, err := bcdata.bc.PrunableStateAt(bcdata.bc.CurrentBlock().Root(), bcdata.bc.CurrentHeader().Number.Uint64())
-	if err != nil {
-		t.Fatal(err)
-	}
-
 }
 
 func bundleEachTwoTxs(_, _ *TestAccountType, _ types.Signer, _, _ *big.Int,
@@ -2322,19 +2302,26 @@ func bundleEachTwoTxs(_, _ *TestAccountType, _ types.Signer, _, _ *big.Int,
 	return func(txs []*types.Transaction, _ []*builder.Bundle) []*builder.Bundle {
 		// Bundle every two tx
 		bundles := []*builder.Bundle{}
-		tmpTx := &types.Transaction{}
+		tmpTx1 := &types.Transaction{}
+		tmpTx2 := &types.Transaction{}
 		for i, tx := range txs {
-			if i%2 == 0 {
-				tmpTx = tx
+			if i%3 == 0 {
+				tmpTx1 = tx
+				continue
+			}
+			if i%3 == 1 {
+				tmpTx2 = tx
 				continue
 			}
 			b := &builder.Bundle{}
-			b.BundleTxs = append(b.BundleTxs, builder.NewTxOrGenFromTx(tmpTx))
+			b.BundleTxs = append(b.BundleTxs, builder.NewTxOrGenFromTx(tmpTx1))
+			b.BundleTxs = append(b.BundleTxs, builder.NewTxOrGenFromTx(tmpTx2))
 			b.BundleTxs = append(b.BundleTxs, builder.NewTxOrGenFromTx(tx))
-			tmpTx = &types.Transaction{}
+			tmpTx1 = &types.Transaction{}
+			tmpTx2 = &types.Transaction{}
 			bundles = append(bundles, b)
-			if i > 1 {
-				b.TargetTxHash = txs[i-2].Hash()
+			if i > 2 {
+				b.TargetTxHash = txs[i-3].Hash()
 			}
 		}
 		return bundles

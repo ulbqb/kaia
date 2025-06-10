@@ -464,6 +464,7 @@ func (db *Database) insertPreimage(hash common.Hash, preimage []byte) {
 // insertPruningMark writes a new pruning mark to the memory database.
 // Note, this method assumes that the database's lock is held!
 func (db *Database) insertPruningMark(hash common.ExtHash, blockNum uint64) {
+	fmt.Println("hoge insertPruningMark", blockNum, hash.Hex())
 	db.pruningMarks = append(db.pruningMarks, database.PruningMark{
 		Number: blockNum,
 		Hash:   hash,
@@ -745,6 +746,7 @@ func (db *Database) dereference(child common.ExtHash, parent common.ExtHash) {
 // Cap iteratively flushes old but still referenced trie nodes until the total
 // memory usage goes below the given threshold.
 func (db *Database) Cap(limit common.StorageSize) error {
+	fmt.Println("hoge Cap")
 	// Create a database batch to flush persistent data out. It is important that
 	// outside code doesn't see an inconsistent state (referenced data removed from
 	// memory cache during commit but not yet in persistent database). This is ensured

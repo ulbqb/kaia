@@ -23,6 +23,7 @@
 package work
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -901,6 +902,7 @@ func (env *Task) commitBundleTransaction(bundle *builder.Bundle, bc BlockChain, 
 	}
 
 	restoreEnv := func() {
+		fmt.Println("hoge Restore")
 		env.state.Set(lastSnapshot)
 		env.header.GasUsed = gasUsedSnapshot
 		env.tcount = tcountSnapshot

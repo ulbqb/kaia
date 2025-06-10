@@ -124,6 +124,11 @@ type StateDB struct {
 	SnapshotCommits      time.Duration
 }
 
+func (s *StateDB) DebugPrint() {
+	trie := s.trie.(*statedb.SecureTrie)
+	fmt.Println("hoge DebugPrint", trie.GetTriePruningMarksCache())
+}
+
 // Create a new state from a given trie.
 func New(root common.Hash, db Database, snaps *snapshot.Tree, opts *statedb.TrieOpts) (*StateDB, error) {
 	tr, err := db.OpenTrie(root, opts)
@@ -1027,6 +1032,7 @@ func (s *StateDB) GetRefund() uint64 {
 // Finalise finalises the state by removing the self destructed objects
 // and clears the journal as well as the refunds.
 func (stateDB *StateDB) Finalise(deleteEmptyObjects bool, setStorageRoot bool) {
+	fmt.Println("hoge Finalise")
 	for addr := range stateDB.journal.dirties {
 		so, exist := stateDB.stateObjects[addr]
 		if !exist {
@@ -1078,6 +1084,7 @@ func (stateDB *StateDB) Finalise(deleteEmptyObjects bool, setStorageRoot bool) {
 // It is called in between transactions to get the root hash that
 // goes into transaction receipts.
 func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
+	fmt.Println("hoge IntermediateRoot")
 	s.Finalise(deleteEmptyObjects, true)
 	// Track the amount of time wasted on hashing the account trie
 	if EnabledExpensive {
@@ -1102,6 +1109,7 @@ func (s *StateDB) clearJournalAndRefund() {
 
 // Commit writes the state to the underlying in-memory trie database.
 func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
+	fmt.Println("hoge Commit")
 	if s.dbErr != nil {
 		return common.Hash{}, fmt.Errorf("commit aborted due to earlier error: %v", s.dbErr)
 	}

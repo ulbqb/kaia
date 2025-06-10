@@ -26,6 +26,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -2038,6 +2039,10 @@ func (dbm *databaseManager) DeletePruningEnabled() {
 
 // WritePruningMarks writes the provided set of pruning marks to the database.
 func (dbm *databaseManager) WritePruningMarks(marks []PruningMark) {
+	for _, mark := range marks {
+		fmt.Printf("hoge WritePruningMarks %v %s\n", mark.Number, mark.Hash.Hex())
+	}
+	debug.PrintStack()
 	batch := dbm.NewBatch(MiscDB)
 	defer batch.Release()
 	for _, mark := range marks {
@@ -2062,6 +2067,7 @@ func (dbm *databaseManager) ReadPruningMarks(startNumber, endNumber uint64) []Pr
 
 	var marks []PruningMark
 	for it.Next() {
+		fmt.Println("hoge ReadPruningMarks")
 		mark := parsePruningMarkKey(it.Key())
 		if endNumber != 0 && mark.Number >= endNumber {
 			break
@@ -2075,6 +2081,7 @@ func (dbm *databaseManager) ReadPruningMarks(startNumber, endNumber uint64) []Pr
 // Note that trie nodes are not deleted by this function. To prune trie nodes, use
 // the PruneTrieNodes or DeleteTrieNode functions.
 func (dbm *databaseManager) DeletePruningMarks(marks []PruningMark) {
+	fmt.Println("hoge DeletePruningMarks", len(marks))
 	batch := dbm.NewBatch(MiscDB)
 	defer batch.Release()
 	for _, mark := range marks {

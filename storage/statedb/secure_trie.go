@@ -43,6 +43,10 @@ type SecureTrie struct {
 	secKeyCacheOwner *SecureTrie // Pointer to self, replace the key cache on mismatch
 }
 
+func (t *SecureTrie) GetTriePruningMarksCache() map[common.ExtHash]uint64 {
+	return t.trie.pruningMarksCache
+}
+
 // NewSecureTrie creates a trie with an existing root node from a backing database
 // and optional intermediate in-memory node pool.
 //

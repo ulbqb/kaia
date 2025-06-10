@@ -288,6 +288,9 @@ func (bcdata *BCData) MineABlock(transactions types.Transactions, signer types.S
 	if err != nil {
 		return nil, nil, err
 	}
+
+	bcdata.bc.WriteBlockWithState(b, receipts, statedb)
+
 	prof.Profile("mine_seal_block", time.Now().Sub(start))
 
 	return b, receipts, nil
@@ -453,23 +456,23 @@ func (bcdata *BCData) genABlockWithTransactionsWithBundle(accountMap *AccountMap
 	}
 	prof.Profile("main_mineABlock", time.Now().Sub(start))
 
-	txs := make(types.Transactions, len(b.Transactions()))
-	for i, tt := range b.Transactions() {
-		encodedTx, err := rlp.EncodeToBytes(tt)
-		if err != nil {
-			return err
-		}
-		decodedTx := types.Transaction{}
-		rlp.DecodeBytes(encodedTx, &decodedTx)
-		txs[i] = &decodedTx
-	}
-	b = b.WithBody(txs)
+	// txs := make(types.Transactions, len(b.Transactions()))
+	// for i, tt := range b.Transactions() {
+	// 	encodedTx, err := rlp.EncodeToBytes(tt)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	decodedTx := types.Transaction{}
+	// 	rlp.DecodeBytes(encodedTx, &decodedTx)
+	// 	txs[i] = &decodedTx
+	// }
+	// b = b.WithBody(txs)
 
-	// Insert the block into the blockchain
-	start = time.Now()
-	if n, err := bcdata.bc.InsertChain(types.Blocks{b}); err != nil {
-		return fmt.Errorf("err = %s, n = %d\n", err, n)
-	}
+	// // Insert the block into the blockchain
+	// start = time.Now()
+	// if n, err := bcdata.bc.InsertChain(types.Blocks{b}); err != nil {
+	// 	return fmt.Errorf("err = %s, n = %d\n", err, n)
+	// }
 	prof.Profile("main_insert_blockchain", time.Now().Sub(start))
 
 	// Apply reward
