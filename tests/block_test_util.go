@@ -515,7 +515,7 @@ func (bb *btBlock) decode() (types.Transactions, btHeader, error) {
 				ethTypeIndex = int(txdata[0] - 0xb7 + 1)
 			}
 			switch txdata[ethTypeIndex] {
-			case 1, 2, 4: // eth transaction types whick kaia support
+			case 1, 2, 3, 4: // eth transaction types whick kaia support
 				ethTxDataInKaia = append([]byte{byte(types.EthereumTxTypeEnvelope)}, txdata[ethTypeIndex:]...)
 			default:
 				ethTxDataInKaia = txdata
