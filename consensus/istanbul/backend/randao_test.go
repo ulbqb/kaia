@@ -21,6 +21,7 @@ import (
 
 	"github.com/kaiachain/kaia/common"
 	"github.com/kaiachain/kaia/common/hexutil"
+	istanbulCommon "github.com/kaiachain/kaia/consensus/istanbul/common"
 	"github.com/kaiachain/kaia/crypto/bls"
 	"github.com/stretchr/testify/assert"
 )
@@ -43,9 +44,9 @@ func TestCalcRandao(t *testing.T) {
 	)
 
 	// Calculate RandomReveal and MixHash
-	assert.Equal(t, msg, calcRandaoMsg(num))
+	assert.Equal(t, msg, istanbulCommon.CalcRandaoMsg(num))
 	assert.Equal(t, sig, bls.Sign(sk, msg[:]).Marshal())
-	assert.Equal(t, mix2, calcMixHash(sig, mix1))
+	assert.Equal(t, mix2, istanbulCommon.CalcMixHash(sig, mix1))
 
 	// Verify signature
 	ok, err := bls.VerifySignature(sig, msg, pk)

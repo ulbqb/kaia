@@ -1,8 +1,7 @@
-package common
+package commonlayer
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"math/big"
 	"time"
@@ -13,18 +12,15 @@ import (
 	"github.com/kaiachain/kaia/consensus"
 	"github.com/kaiachain/kaia/consensus/interfaces"
 	"github.com/kaiachain/kaia/consensus/istanbul"
+	istanbulCommon "github.com/kaiachain/kaia/consensus/istanbul/common"
 	istanbulCore "github.com/kaiachain/kaia/consensus/istanbul/core"
 	"github.com/kaiachain/kaia/consensus/misc"
 	"github.com/kaiachain/kaia/consensus/misc/eip4844"
-	"github.com/kaiachain/kaia/crypto"
 	"github.com/kaiachain/kaia/crypto/bls"
-	"github.com/kaiachain/kaia/crypto/sha3"
 	"github.com/kaiachain/kaia/kaiax"
 	"github.com/kaiachain/kaia/kaiax/gov"
 	"github.com/kaiachain/kaia/kaiax/randao"
 	"github.com/kaiachain/kaia/kaiax/valset"
-	"github.com/kaiachain/kaia/params"
-	"github.com/kaiachain/kaia/rlp"
 )
 
 var (
@@ -60,9 +56,20 @@ func (sb *IstanbulVerifier) VerifyHeader(chain consensus.ChainReader, header *ty
 	return sb.verifyHeader(chain, header, parent)
 }
 
-// VerifySeals validates consensus proof (IBFT: verify CommittedSeals)
+// VerifySeal checks whether the crypto seal on a header is valid according to
+// the consensus rules of the given engine.
 func (sb *IstanbulVerifier) VerifySeals(chain consensus.ChainReader, header *types.Header) error {
-	return sb.verifyCommittedSeals(chain, header, nil)
+	// get parent header and ensure the signer is in parent's validator set
+	number := header.Number.Uint64()
+	if number == 0 {
+		return errUnknownBlock
+	}
+
+	// ensure that the blockscore equals to defaultBlockScore
+	if header.BlockScore.Cmp(defaultBlockScore) != 0 {
+		return errInvalidBlockScore
+	}
+	return sb.verifySigner(chain, header, nil)
 }
 
 // verifyHeader checks whether a header conforms to the consensus rules.The
@@ -115,7 +122,7 @@ func (sb *IstanbulVerifier) verifyHeader(chain consensus.ChainReader, header *ty
 		}
 	}
 
-	return nil
+	return sb.verifyCommittedSeals(chain, header, nil)
 }
 
 // verifyCascadingFields verifies all the header fields that are not standalone,
@@ -147,7 +154,7 @@ func (sb *IstanbulVerifier) verifyCascadingFields(chain consensus.ChainReader, h
 
 	// VerifyRandao must be after verifySigner because it needs the signer (proposer) address
 	if chain.Config().IsRandaoForkEnabled(header.Number) {
-		prevMixHash := headerMixHash(chain, parent)
+		prevMixHash := istanbulCommon.HeaderMixHash(chain, parent)
 		if err := sb.VerifyRandao(chain, header, prevMixHash); err != nil {
 			return err
 		}
@@ -174,7 +181,7 @@ func (sb *IstanbulVerifier) verifyCascadingFields(chain consensus.ChainReader, h
 }
 
 func (sb *IstanbulVerifier) Author(header *types.Header) (common.Address, error) {
-	return ecrecover(header)
+	return istanbulCommon.ECRecover(header)
 }
 
 func (sb *IstanbulVerifier) VerifyRandao(chain consensus.ChainReader, header *types.Header, prevMixHash []byte) error {
@@ -196,7 +203,7 @@ func (sb *IstanbulVerifier) VerifyRandao(chain consensus.ChainReader, header *ty
 
 	// if not verify(proposerPubkey, newHeader.number, newHeader.randomReveal): return False
 	sig := header.RandomReveal
-	msg := calcRandaoMsg(header.Number)
+	msg := istanbulCommon.CalcRandaoMsg(header.Number)
 	ok, err := bls.VerifySignature(sig, msg, proposerPub)
 	if err != nil {
 		return err
@@ -205,21 +212,12 @@ func (sb *IstanbulVerifier) VerifyRandao(chain consensus.ChainReader, header *ty
 	}
 
 	// if not newHeader.mixHash == calc_mix_hash(prevMixHash, newHeader.randomReveal): return False
-	mixHash := calcMixHash(header.RandomReveal, prevMixHash)
+	mixHash := istanbulCommon.CalcMixHash(header.RandomReveal, prevMixHash)
 	if !bytes.Equal(header.MixHash, mixHash) {
 		return errInvalidRandaoFields
 	}
 
 	return nil
-}
-
-func calcMixHash(randomReveal, prevMixHash []byte) []byte {
-	mixHash := make([]byte, 32)
-	revealHash := crypto.Keccak256(randomReveal)
-	for i := 0; i < 32; i++ {
-		mixHash[i] = prevMixHash[i] ^ revealHash[i]
-	}
-	return mixHash
 }
 
 func (sb *IstanbulVerifier) verifyCommittedSeals(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
@@ -251,7 +249,7 @@ func (sb *IstanbulVerifier) verifyCommittedSeals(chain consensus.ChainReader, he
 	// 1. Get committed seals from current header
 	for _, seal := range extra.CommittedSeal {
 		// 2. Get the original address by seal and parent block hash
-		addr, err := cacheSignatureAddresses(proposalSeal, seal)
+		addr, err := istanbulCommon.CacheSignatureAddresses(proposalSeal, seal)
 		if err != nil {
 			return errInvalidSignature
 		}
@@ -270,11 +268,6 @@ func (sb *IstanbulVerifier) verifyCommittedSeals(chain consensus.ChainReader, he
 	}
 
 	return nil
-}
-
-// block_num_to_bytes() = num.to_bytes(32, byteorder="big")
-func calcRandaoMsg(number *big.Int) common.Hash {
-	return common.BytesToHash(number.Bytes())
 }
 
 func (sb *IstanbulVerifier) GetCommitteeStateByRound(num uint64, round uint64) (*istanbul.RoundCommitteeState, error) {
@@ -343,7 +336,7 @@ func (sb *IstanbulVerifier) verifySigner(chain consensus.ChainReader, header *ty
 	}
 
 	// resolve the authorization key and check against signers
-	signer, err := ecrecover(header)
+	signer, err := istanbulCommon.ECRecover(header)
 	if err != nil {
 		return err
 	}
@@ -367,53 +360,6 @@ func (sb *IstanbulVerifier) GetValidatorSet(num uint64) (*istanbul.BlockValSet, 
 	}
 
 	return istanbul.NewBlockValSet(council, demoted), nil
-}
-
-// ecrecover extracts the Kaia account address from a signed header.
-func ecrecover(header *types.Header) (common.Address, error) {
-	// Retrieve the signature from the header extra-data
-	istanbulExtra, err := types.ExtractIstanbulExtra(header)
-	if err != nil {
-		return common.Address{}, err
-	}
-	addr, err := cacheSignatureAddresses(sigHash(header).Bytes(), istanbulExtra.Seal)
-	if err != nil {
-		return addr, err
-	}
-
-	return addr, nil
-}
-
-// cacheSignatureAddresses extracts the address from the given data and signature and cache them for later usage.
-func cacheSignatureAddresses(data []byte, sig []byte) (common.Address, error) {
-	sigStr := hex.EncodeToString(sig)
-	if addr, ok := signatureAddresses.Get(sigStr); ok {
-		return addr.(common.Address), nil
-	}
-	addr, err := istanbul.GetSignatureAddress(data, sig)
-	if err != nil {
-		return common.Address{}, err
-	}
-	signatureAddresses.Add(sigStr, addr)
-	return addr, err
-}
-
-func sigHash(header *types.Header) (hash common.Hash) {
-	hasher := sha3.NewKeccak256()
-
-	// Clean seal is required for calculating proposer seal.
-	rlp.Encode(hasher, types.IstanbulFilteredHeader(header, false))
-	hasher.Sum(hash[:0])
-	return hash
-}
-
-// At the fork block's parent, pretend that prevMixHash is ZeroMixHash.
-func headerMixHash(chain consensus.ChainReader, header *types.Header) []byte {
-	if chain.Config().IsRandaoForkBlockParent(header.Number) {
-		return params.ZeroMixHash
-	} else {
-		return header.MixHash
-	}
 }
 
 var (

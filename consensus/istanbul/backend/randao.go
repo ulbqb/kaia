@@ -16,16 +16,11 @@
 package backend
 
 import (
-	"bytes"
 	"math/big"
 
-	"github.com/kaiachain/kaia/blockchain/types"
-	"github.com/kaiachain/kaia/common"
 	"github.com/kaiachain/kaia/common/hexutil"
-	"github.com/kaiachain/kaia/consensus"
-	"github.com/kaiachain/kaia/crypto"
+	istanbulCommon "github.com/kaiachain/kaia/consensus/istanbul/common"
 	"github.com/kaiachain/kaia/crypto/bls"
-	"github.com/kaiachain/kaia/params"
 )
 
 // Calculate KIP-114 Randao header fields
@@ -40,73 +35,13 @@ func (sb *backend) CalcRandao(number *big.Int, prevMixHash []byte) ([]byte, []by
 	}
 
 	// block_num_to_bytes() = num.to_bytes(32, byteorder="big")
-	msg := calcRandaoMsg(number)
+	msg := istanbulCommon.CalcRandaoMsg(number)
 
 	// calc_random_reveal() = sign(privateKey, headerNumber)
 	randomReveal := bls.Sign(sb.blsSecretKey, msg[:]).Marshal()
 
 	// calc_mix_hash() = xor(prevMixHash, keccak256(randomReveal))
-	mixHash := calcMixHash(randomReveal, prevMixHash)
+	mixHash := istanbulCommon.CalcMixHash(randomReveal, prevMixHash)
 
 	return randomReveal, mixHash, nil
-}
-
-func (sb *backend) VerifyRandao(chain consensus.ChainReader, header *types.Header, prevMixHash []byte) error {
-	if header.Number.Sign() == 0 {
-		return nil // Do not verify genesis block
-	}
-
-	proposer, err := sb.Author(header)
-	if err != nil {
-		return err
-	}
-
-	// [proposerPubkey, proposerPop] = get_proposer_pubkey_pop()
-	// if not pop_verify(proposerPubkey, proposerPop): return False
-	proposerPub, err := sb.randaoModule.GetBlsPubkey(proposer, header.Number)
-	if err != nil {
-		return err
-	}
-
-	// if not verify(proposerPubkey, newHeader.number, newHeader.randomReveal): return False
-	sig := header.RandomReveal
-	msg := calcRandaoMsg(header.Number)
-	ok, err := bls.VerifySignature(sig, msg, proposerPub)
-	if err != nil {
-		return err
-	} else if !ok {
-		return errInvalidRandaoFields
-	}
-
-	// if not newHeader.mixHash == calc_mix_hash(prevMixHash, newHeader.randomReveal): return False
-	mixHash := calcMixHash(header.RandomReveal, prevMixHash)
-	if !bytes.Equal(header.MixHash, mixHash) {
-		return errInvalidRandaoFields
-	}
-
-	return nil
-}
-
-// block_num_to_bytes() = num.to_bytes(32, byteorder="big")
-func calcRandaoMsg(number *big.Int) common.Hash {
-	return common.BytesToHash(number.Bytes())
-}
-
-// calc_mix_hash() = xor(prevMixHash, keccak256(randomReveal))
-func calcMixHash(randomReveal, prevMixHash []byte) []byte {
-	mixHash := make([]byte, 32)
-	revealHash := crypto.Keccak256(randomReveal)
-	for i := 0; i < 32; i++ {
-		mixHash[i] = prevMixHash[i] ^ revealHash[i]
-	}
-	return mixHash
-}
-
-// At the fork block's parent, pretend that prevMixHash is ZeroMixHash.
-func headerMixHash(chain consensus.ChainReader, header *types.Header) []byte {
-	if chain.Config().IsRandaoForkBlockParent(header.Number) {
-		return params.ZeroMixHash
-	} else {
-		return header.MixHash
-	}
 }

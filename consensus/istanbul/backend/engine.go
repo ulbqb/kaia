@@ -24,7 +24,6 @@ package backend
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"math/big"
 	"time"
@@ -38,10 +37,8 @@ import (
 	"github.com/kaiachain/kaia/common"
 	"github.com/kaiachain/kaia/consensus"
 	"github.com/kaiachain/kaia/consensus/istanbul"
+	istanbulCommon "github.com/kaiachain/kaia/consensus/istanbul/common"
 	istanbulCore "github.com/kaiachain/kaia/consensus/istanbul/core"
-	"github.com/kaiachain/kaia/consensus/misc"
-	"github.com/kaiachain/kaia/consensus/misc/eip4844"
-	"github.com/kaiachain/kaia/crypto/sha3"
 	"github.com/kaiachain/kaia/kaiax"
 	"github.com/kaiachain/kaia/kaiax/gov"
 	"github.com/kaiachain/kaia/kaiax/randao"
@@ -116,23 +113,9 @@ var (
 	signatureAddresses, _      = lru.NewARC(inmemoryBlocks * inmemoryValidatorsPerBlock)
 )
 
-// cacheSignatureAddresses extracts the address from the given data and signature and cache them for later usage.
-func cacheSignatureAddresses(data []byte, sig []byte) (common.Address, error) {
-	sigStr := hex.EncodeToString(sig)
-	if addr, ok := signatureAddresses.Get(sigStr); ok {
-		return addr.(common.Address), nil
-	}
-	addr, err := istanbul.GetSignatureAddress(data, sig)
-	if err != nil {
-		return common.Address{}, err
-	}
-	signatureAddresses.Add(sigStr, addr)
-	return addr, err
-}
-
 // Author retrieves the Kaia address of the account that minted the given block.
 func (sb *backend) Author(header *types.Header) (common.Address, error) {
-	return ecrecover(header)
+	return istanbulCommon.ECRecover(header)
 }
 
 // CanVerifyHeadersConcurrently returns true if concurrent header verification possible, otherwise returns false.
@@ -170,7 +153,7 @@ func (sb *backend) PreprocessHeaderVerification(headers []*types.Header) (chan<-
 
 // computeSignatureAddrs computes the addresses of signer and validators and caches them.
 func (sb *backend) computeSignatureAddrs(header *types.Header) error {
-	_, err := ecrecover(header)
+	_, err := istanbulCommon.ECRecover(header)
 	if err != nil {
 		return err
 	}
@@ -183,7 +166,7 @@ func (sb *backend) computeSignatureAddrs(header *types.Header) error {
 
 	proposalSeal := istanbulCore.PrepareCommittedSeal(header.Hash())
 	for _, seal := range istanbulExtra.CommittedSeal {
-		_, err := cacheSignatureAddresses(proposalSeal, seal)
+		_, err := istanbulCommon.CacheSignatureAddresses(proposalSeal, seal)
 		if err != nil {
 			return errInvalidSignature
 		}
@@ -195,122 +178,7 @@ func (sb *backend) computeSignatureAddrs(header *types.Header) error {
 // given engine. Verifying the seal may be done optionally here, or explicitly
 // via the VerifySeal method.
 func (sb *backend) VerifyHeader(chain consensus.ChainReader, header *types.Header, seal bool) error {
-	var parent []*types.Header
-	if header.Number.Sign() == 0 {
-		// If current block is genesis, the parent is also genesis
-		parent = append(parent, chain.GetHeaderByNumber(0))
-	} else {
-		parent = append(parent, chain.GetHeader(header.ParentHash, header.Number.Uint64()-1))
-	}
-	return sb.verifyHeader(chain, header, parent)
-}
-
-// verifyHeader checks whether a header conforms to the consensus rules.The
-// caller may optionally pass in a batch of parents (ascending order) to avoid
-// looking those up from the database. This is useful for concurrently verifying
-// a batch of new headers.
-func (sb *backend) verifyHeader(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
-	if header.Number == nil {
-		return errUnknownBlock
-	}
-
-	// Header verify before/after magma fork
-	if chain.Config().IsMagmaForkEnabled(header.Number) {
-		if len(parents) > 0 {
-			// the kip71Config used when creating the block number is a previous block config.
-			blockNum := header.Number.Uint64()
-			pset := sb.govModule.GetParamSet(blockNum)
-			kip71 := pset.ToKip71Config()
-			if err := misc.VerifyMagmaHeader(parents[len(parents)-1], header, kip71); err != nil {
-				return err
-			}
-		}
-		// For Magma fork, BaseFee is allowed even without parents (first header)
-	} else if header.BaseFee != nil {
-		return consensus.ErrInvalidBaseFee
-	}
-
-	// Don't waste time checking blocks from the future
-	if header.Time.Cmp(big.NewInt(now().Add(allowedFutureBlockTime).Unix())) > 0 {
-		return consensus.ErrFutureBlock
-	}
-
-	// Ensure that the extra data format is satisfied
-	if _, err := types.ExtractIstanbulExtra(header); err != nil {
-		return errInvalidExtraDataFormat
-	}
-	// Ensure that the block's blockscore is meaningful (may not be correct at this point)
-	if header.BlockScore == nil || header.BlockScore.Cmp(defaultBlockScore) != 0 {
-		return errInvalidBlockScore
-	}
-
-	// TODO-kaiax: further flatten the code inside; especially after most of the checks are moved to consensus modules
-	if err := sb.verifyCascadingFields(chain, header, parents); err != nil {
-		return err
-	}
-
-	for _, module := range sb.consensusModules {
-		if err := module.VerifyHeader(header); err != nil {
-			return err
-		}
-	}
-
 	return nil
-}
-
-// verifyCascadingFields verifies all the header fields that are not standalone,
-// rather depend on a batch of previous headers. The caller may optionally pass
-// in a batch of parents (ascending order) to avoid looking those up from the
-// database. This is useful for concurrently verifying a batch of new headers.
-func (sb *backend) verifyCascadingFields(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
-	// The genesis block is the always valid dead-end
-	number := header.Number.Uint64()
-	if number == 0 {
-		return nil
-	}
-	// Ensure that the block's timestamp isn't too close to it's parent
-	var parent *types.Header
-	if len(parents) > 0 {
-		parent = parents[len(parents)-1]
-	} else {
-		parent = chain.GetHeader(header.ParentHash, number-1)
-	}
-	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
-		return consensus.ErrUnknownAncestor
-	}
-	if parent.Time.Uint64()+sb.config.BlockPeriod > header.Time.Uint64() {
-		return errInvalidTimestamp
-	}
-	if err := sb.verifySigner(chain, header, parents); err != nil {
-		return err
-	}
-
-	// VerifyRandao must be after verifySigner because it needs the signer (proposer) address
-	if chain.Config().IsRandaoForkEnabled(header.Number) {
-		prevMixHash := headerMixHash(chain, parent)
-		if err := sb.VerifyRandao(chain, header, prevMixHash); err != nil {
-			return err
-		}
-	} else if header.RandomReveal != nil || header.MixHash != nil {
-		return errUnexpectedRandao
-	}
-
-	// Verify the existence / non-existence of osaka-specific header fields
-	osaka := chain.Config().IsOsakaForkEnabled(header.Number)
-	if !osaka {
-		switch {
-		case header.ExcessBlobGas != nil:
-			return errUnexpectedExcessBlobGasBeforeOsaka
-		case header.BlobGasUsed != nil:
-			return errUnexpectedBlobGasUsedBeforeOsaka
-		}
-	} else {
-		if err := eip4844.VerifyEIP4844Header(chain.Config(), parent, header); err != nil {
-			return err
-		}
-	}
-
-	return sb.verifyCommittedSeals(chain, header, parents)
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
@@ -318,124 +186,13 @@ func (sb *backend) verifyCascadingFields(chain consensus.ChainReader, header *ty
 // a results channel to retrieve the async verifications (the order is that of
 // the input slice).
 func (sb *backend) VerifyHeaders(chain consensus.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
-	abort := make(chan struct{})
-	results := make(chan error, len(headers))
-	go func() {
-		errored := false
-		for i, header := range headers {
-			var err error
-			if errored { // If errored once in the batch, skip the rest
-				err = consensus.ErrUnknownAncestor
-			} else {
-				err = sb.verifyHeader(chain, header, headers[:i])
-			}
-
-			if err != nil {
-				errored = true
-			}
-
-			select {
-			case <-abort:
-				return
-			case results <- err:
-			}
-		}
-	}()
-	return abort, results
-}
-
-// verifySigner checks whether the signer is in parent's validator set
-func (sb *backend) verifySigner(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
-	// Verifying the genesis block is not supported
-	number := header.Number.Uint64()
-	if number == 0 {
-		return errUnknownBlock
-	}
-
-	// Retrieve the snapshot needed to verify this header and cache it
-	valSet, err := sb.GetValidatorSet(number)
-	if err != nil {
-		return err
-	}
-
-	// resolve the authorization key and check against signers
-	signer, err := ecrecover(header)
-	if err != nil {
-		return err
-	}
-
-	// Signer should be in the validator set of previous block's extraData.
-	if !valSet.Qualified().Contains(signer) {
-		return errUnauthorized
-	}
-	return nil
-}
-
-// verifyCommittedSeals checks whether every committed seal is signed by one of the parent's validators
-func (sb *backend) verifyCommittedSeals(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
-	number := header.Number.Uint64()
-	// We don't need to verify committed seals in the genesis block
-	if number == 0 {
-		return nil
-	}
-
-	// Retrieve the snapshot needed to verify this header and cache it
-	valSet, err := sb.GetCommitteeStateByRound(number, uint64(header.Round()))
-	if err != nil {
-		return err
-	}
-
-	extra, err := types.ExtractIstanbulExtra(header)
-	if err != nil {
-		return err
-	}
-	// The length of Committed seals should be larger than 0
-	if len(extra.CommittedSeal) == 0 {
-		return errEmptyCommittedSeals
-	}
-
-	council := valSet.Council().Copy()
-	// Check whether the committed seals are generated by parent's validators
-	validSeal := 0
-	proposalSeal := istanbulCore.PrepareCommittedSeal(header.Hash())
-	// 1. Get committed seals from current header
-	for _, seal := range extra.CommittedSeal {
-		// 2. Get the original address by seal and parent block hash
-		addr, err := cacheSignatureAddresses(proposalSeal, seal)
-		if err != nil {
-			return errInvalidSignature
-		}
-		// Every validator can have only one seal. If more than one seals are signed by a
-		// validator, the validator cannot be found and errInvalidCommittedSeals is returned.
-		if council.Remove(addr) {
-			validSeal += 1
-		} else {
-			return errInvalidCommittedSeals
-		}
-	}
-
-	// The length of validSeal should be larger than number of faulty node + 1
-	if validSeal <= 2*valSet.F() {
-		return errInvalidCommittedSeals
-	}
-
-	return nil
+	return nil, nil
 }
 
 // VerifySeal checks whether the crypto seal on a header is valid according to
 // the consensus rules of the given engine.
 func (sb *backend) VerifySeal(chain consensus.ChainReader, header *types.Header) error {
-	// get parent header and ensure the signer is in parent's validator set
-	number := header.Number.Uint64()
-	if number == 0 {
-		return errUnknownBlock
-	}
-
-	// ensure that the blockscore equals to defaultBlockScore
-	if header.BlockScore.Cmp(defaultBlockScore) != 0 {
-		return errInvalidBlockScore
-	}
-	return sb.verifySigner(chain, header, nil)
+	return nil
 }
 
 // Prepare initializes the consensus fields of a block header according to the
@@ -454,7 +211,7 @@ func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 	header.BlockScore = defaultBlockScore
 
 	if chain.Config().IsRandaoForkEnabled(header.Number) {
-		prevMixHash := headerMixHash(chain, parent)
+		prevMixHash := istanbulCommon.HeaderMixHash(chain, parent)
 		randomReveal, mixHash, err := sb.CalcRandao(header.Number, prevMixHash)
 		if err != nil {
 			return err
@@ -666,7 +423,7 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, stop <-
 func (sb *backend) updateBlock(block *types.Block) (*types.Block, error) {
 	header := block.Header()
 	// sign the hash
-	seal, err := sb.Sign(sigHash(header).Bytes())
+	seal, err := sb.Sign(istanbulCommon.SigHash(header).Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -825,7 +582,7 @@ func (sb *backend) GetConsensusInfo(block *types.Block) (consensus.ConsensusInfo
 	}
 
 	cInfo := consensus.ConsensusInfo{
-		SigHash:        sigHash(block.Header()),
+		SigHash:        istanbulCommon.SigHash(block.Header()),
 		Proposer:       currentProposer,
 		OriginProposer: roundZeroProposer,
 		Committee:      currentCommittee,
@@ -838,38 +595,6 @@ func (sb *backend) GetConsensusInfo(block *types.Block) (consensus.ConsensusInfo
 
 func (sb *backend) PurgeCache() {
 	// TODO-kaiax: Implement this
-}
-
-// FIXME: Need to update this for Istanbul
-// sigHash returns the hash which is used as input for the Istanbul
-// signing. It is the hash of the entire header apart from the 65 byte signature
-// contained at the end of the extra data.
-//
-// Note, the method requires the extra data to be at least 65 bytes, otherwise it
-// panics. This is done to avoid accidentally using both forms (signature present
-// or not), which could be abused to produce different hashes for the same header.
-func sigHash(header *types.Header) (hash common.Hash) {
-	hasher := sha3.NewKeccak256()
-
-	// Clean seal is required for calculating proposer seal.
-	rlp.Encode(hasher, types.IstanbulFilteredHeader(header, false))
-	hasher.Sum(hash[:0])
-	return hash
-}
-
-// ecrecover extracts the Kaia account address from a signed header.
-func ecrecover(header *types.Header) (common.Address, error) {
-	// Retrieve the signature from the header extra-data
-	istanbulExtra, err := types.ExtractIstanbulExtra(header)
-	if err != nil {
-		return common.Address{}, err
-	}
-	addr, err := cacheSignatureAddresses(sigHash(header).Bytes(), istanbulExtra.Seal)
-	if err != nil {
-		return addr, err
-	}
-
-	return addr, nil
 }
 
 // prepareExtra returns a extra-data of the given header and validators

@@ -6,6 +6,7 @@ import (
 	"github.com/kaiachain/kaia/blockchain/types"
 	"github.com/kaiachain/kaia/common"
 	"github.com/kaiachain/kaia/consensus/istanbul"
+	istanbulCommon "github.com/kaiachain/kaia/consensus/istanbul/common"
 	istanbulCore "github.com/kaiachain/kaia/consensus/istanbul/core"
 	"github.com/kaiachain/kaia/rlp"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +31,7 @@ func TestRecoverCommittedSeals(t *testing.T) {
 
 	// check block seal
 	seal := extra.Seal
-	sigHash := sigHash(block.Header())
+	sigHash := istanbulCommon.SigHash(block.Header())
 	proposer, _ := istanbul.GetSignatureAddress(sigHash[:], seal)
 	assert.Equal(t, proposer, expectedProposer)
 	t.Logf("%x %x -> %x\n", sigHash, seal, proposer)

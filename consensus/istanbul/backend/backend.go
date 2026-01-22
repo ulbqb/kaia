@@ -35,6 +35,7 @@ import (
 	"github.com/kaiachain/kaia/common"
 	"github.com/kaiachain/kaia/consensus"
 	"github.com/kaiachain/kaia/consensus/istanbul"
+	istanbulCommon "github.com/kaiachain/kaia/consensus/istanbul/common"
 	istanbulCore "github.com/kaiachain/kaia/consensus/istanbul/core"
 	"github.com/kaiachain/kaia/crypto"
 	"github.com/kaiachain/kaia/crypto/bls"
@@ -369,7 +370,7 @@ func (sb *backend) Sign(data []byte) ([]byte, error) {
 
 // CheckSignature implements istanbul.Backend.CheckSignature
 func (sb *backend) CheckSignature(data []byte, address common.Address, sig []byte) error {
-	signer, err := cacheSignatureAddresses(data, sig)
+	signer, err := istanbulCommon.CacheSignatureAddresses(data, sig)
 	if err != nil {
 		logger.Error("Failed to get signer address", "err", err)
 		return err
