@@ -11,6 +11,7 @@ import (
 	"github.com/kaiachain/kaia/blockchain/types"
 	"github.com/kaiachain/kaia/common"
 	"github.com/kaiachain/kaia/consensus"
+	"github.com/kaiachain/kaia/consensus/interfaces"
 	"github.com/kaiachain/kaia/consensus/istanbul"
 	istanbulCore "github.com/kaiachain/kaia/consensus/istanbul/core"
 	"github.com/kaiachain/kaia/consensus/misc"
@@ -35,7 +36,7 @@ var (
 	defaultBlockScore      = big.NewInt(1)
 )
 
-// var _ interfaces.Verifier = &IstanbulVerifier{}
+var _ interfaces.Verifier = &IstanbulVerifier{}
 
 type IstanbulVerifier struct {
 	config           *istanbul.Config
@@ -57,6 +58,11 @@ func (sb *IstanbulVerifier) VerifyHeader(chain consensus.ChainReader, header *ty
 		parent = append(parent, chain.GetHeader(header.ParentHash, header.Number.Uint64()-1))
 	}
 	return sb.verifyHeader(chain, header, parent)
+}
+
+// VerifySeals validates consensus proof (IBFT: verify CommittedSeals)
+func (sb *IstanbulVerifier) VerifySeals(chain consensus.ChainReader, header *types.Header) error {
+	return sb.verifyCommittedSeals(chain, header, nil)
 }
 
 // verifyHeader checks whether a header conforms to the consensus rules.The
@@ -164,7 +170,7 @@ func (sb *IstanbulVerifier) verifyCascadingFields(chain consensus.ChainReader, h
 		}
 	}
 
-	return sb.verifyCommittedSeals(chain, header, parents)
+	return nil
 }
 
 func (sb *IstanbulVerifier) Author(header *types.Header) (common.Address, error) {
